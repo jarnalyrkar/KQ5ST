@@ -54,7 +54,8 @@ button cycles the cursors, move to the top of the screen for the icon bar.
 
 KNOWN PROBLEMS
 --------------
-- Play-tested through the opening and the town. Later rooms may crash.
+- Play-tested from the opening through the town, the forest and the
+  desert (oasis, temple, bandits' tent). Later rooms may crash.
 - Music runs at 50 Hz (about 17% slow); no percussion; some sounds silent.
 - Rooms that scroll sideways would crash (not met yet).
 - Copy protection is removed, as in the later CD release.

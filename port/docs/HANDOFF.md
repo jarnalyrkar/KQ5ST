@@ -9,7 +9,8 @@ state only; how things work is in the area files.
   1.62, 4 MB) through a TOS shim that stands in for AmigaOS; built from `port/st/` with
   `st/build.sh` (`WORKFLOW.md`, `ARCHITECTURE.md`).
 - **Play-tested by the user**: intro, cartoon, first rooms, Crispin's house, the snake warning,
-  the town; walking, icon bar, settings panel, talking, depth sorting (behind/in front of a
+  the town, the bakery, the bear, the ants, the desert, the oasis, the temple and the
+  bandits' tent (2026-10-18); walking, icon bar, settings panel, talking, depth sorting (behind/in front of a
   tree), save and restore.
 - **Art** (`GRAPHICS.md`): EGA backgrounds embedded in the Amiga pictures (110), EGA views where
   structurally safe (253), Amiga views reduced to 16 colours (217); fixed EGA palette; delivered

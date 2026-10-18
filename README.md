@@ -35,8 +35,8 @@ the port takes the shipped Amiga version and makes it run on TOS:
   skips, map the keypad as in the PC manual, and remove the copy protection (as in the later CD
   release).
 
-It runs in Hatari (STE, TOS 1.62, 4 MB) and has been play-tested through the opening and the
-town. See [`port/docs/HANDOFF.md`](port/docs/HANDOFF.md) for the current state and known gaps.
+It runs in Hatari (STE, TOS 1.62, 4 MB) and has been play-tested from the opening through the town,
+the forest and the desert (oasis, temple, bandits' tent). See [`port/docs/HANDOFF.md`](port/docs/HANDOFF.md) for the current state and known gaps.
 
 ## What is in this repository
 
@@ -136,8 +136,6 @@ The project could not have been done without these:
   linker that build `KQ5ST.PRG`.
 - **[Python](https://www.python.org/)** and **[Pillow](https://python-pillow.org/)**: all tools
   and image work.
-- **[maxYMiser](https://www.preromanbritain.com/maxymiser/)** by gwEm (freeware, not included):
-  used to try out YM2149 sounds by ear.
 - **[SoX](https://sourceforge.net/projects/sox/)** and **[FFmpeg](https://ffmpeg.org/)**:
   recording and listening to sound output.
 

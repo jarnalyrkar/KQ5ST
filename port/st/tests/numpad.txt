@@ -1,0 +1,24 @@
+# keypad keys through the IKBD decoder: raw make/break bytes (no real keyboard needed).
+# The keypad is reported as PC keypad key codes (type 4), as on the Amiga/DOS; the kernel's
+# MapKeyToDir turns them into direction events for the game. Expected log: type 4 msg 18432
+# ($4800, kp8), msg 19712 ($4d00, kp6), msg 19456 ($4c00, kp5), msg 20992 ($5200, kp0 = Insert),
+# msg 21248 ($5300, kp. = Delete), msg 13 (kp Enter), then a 'q' key and a mouse packet; a release
+# posts nothing, a key held longer than 0.5 s repeats.
+1510 ikbd $68
+1515 ikbd $e8
+1520 ikbd $6c
+1525 ikbd $ec
+1530 ikbd $6b
+1535 ikbd $eb
+1540 ikbd $70
+1545 ikbd $f0
+1550 ikbd $71
+1555 ikbd $f1
+1560 ikbd $72
+1565 ikbd $f2
+1570 ikbd $10
+1575 ikbd $90
+1580 ikbd $f8
+1580 ikbd $05
+1580 ikbd $fd
+1700 quit

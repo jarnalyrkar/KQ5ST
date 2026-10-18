@@ -1,0 +1,13 @@
+4000 press 256 129
+4010 release
+6200 profreset
+6210 click 40 175
+6600 move 200 120
+6700 click 280 150
+7100 move 100 60
+7200 click 60 160
+7700 prof
+7710 shot
+7720 move 140 100
+7800 shot
+7810 quit

@@ -1,0 +1,6 @@
+# Esc during the Sierra logo, then during the title song
+1200 key 27
+1230 shot
+1500 key 27
+1530 shot
+1700 quit

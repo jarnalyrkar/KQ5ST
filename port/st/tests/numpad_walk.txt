@@ -1,0 +1,12 @@
+# windowed run: skip the cartoon, walk once with the mouse (reference), then keypad 6 and 8
+# (each press moves the pointer 20 pixels; with the walk cursor, Enter walks Graham there)
+4000 press 256 129
+4010 release
+6100 click 120 170
+6600 ikbd $6c
+6700 ikbd $ec
+6800 ikbd $68
+6900 ikbd $e8
+7000 ikbd $72
+7100 ikbd $f2
+7300 quit

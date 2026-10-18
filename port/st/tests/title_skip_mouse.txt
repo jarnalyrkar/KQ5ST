@@ -1,0 +1,16 @@
+# both mouse buttons (raw IKBD relative mouse packets) during the logo and the song
+1200 ikbd $fb
+1200 ikbd 0
+1200 ikbd 0
+1210 ikbd $f8
+1210 ikbd 0
+1210 ikbd 0
+1230 shot
+1500 ikbd $fb
+1500 ikbd 0
+1500 ikbd 0
+1510 ikbd $f8
+1510 ikbd 0
+1510 ikbd 0
+1530 shot
+1700 quit

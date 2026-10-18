@@ -1,0 +1,8 @@
+4000 press 256 129
+4010 release
+6600 move 160 3
+7000 shot
+7200 click 256 8
+7900 shot
+8600 shot
+8700 quit

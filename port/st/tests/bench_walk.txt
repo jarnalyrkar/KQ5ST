@@ -1,0 +1,14 @@
+4000 press 256 129
+4010 release
+6200 click 40 175
+6600 click 280 150
+7000 click 60 160
+7400 click 280 150
+7500 profreset
+7800 click 60 160
+8200 click 280 150
+8600 click 60 160
+9000 click 280 150
+9400 click 60 160
+9800 prof
+9810 quit

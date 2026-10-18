@@ -1,0 +1,33 @@
+# hunk  offset  expected   replacement   # Prog patches for the TOS shim
+# "movea.l $4.w,a6" (ExecBase from low memory) -> "trap #5; nop" (shim returns fake ExecBase)
+62  3e    2c780004   4e454e71   # C startup
+62  d86   2c780004   4e454e71   # C runtime
+52  58    2c780004   4e454e71   # display init
+29  16a   2c780004   4e454e71   # timer/interrupt
+29  18e   2c780004   4e454e71   # timer/interrupt
+55  171e  2c780004   4e454e71   # graphics memory
+# Blitter routines -> CPU versions in blit.c
+52  872   48e70344b87c   JMP:stub_blit    # video driver rectangle engine (fill/copy/save/restore)
+55  128   2f0d4bf900df   JMP:hook_pcfill      # Graph: priority/control blitter fill, resumes at +$184
+# Graph GetColorCount: the video driver answers 32 (5 planes); the scripts switch dialog, inventory
+# and settings colours on it (256 / 32 / else = EGA, script 0 KQ5::init). The ST art set is EGA, so
+# answer 16: "movea.w #0,a2; jsr -$7c56(a4)" -> "move.w #16,d0; nop; nop" (GRAPHICS.md).
+55  1a9c  347c00004eac83aa  303c00104e714e71
+# NULL-pointer reads that are harmless on the Amiga (ROM/low memory) but fault on the ST
+23  534   082d0000000b   JMP:hook_isobject    # IsObject: check pointer before reading the magic word
+# Input: joystick poll (reads JOY1DAT/CIA) -> ST mouse + keyboard event source
+16  160   4e55ffda426d   JMP:stub_input_poll
+# "movea.l #4,a0; movea.l (a0),a6" (mouse position helpers) -> trap #5
+40  1c    207c000000042c50  4e454e714e714e71
+40  62    207c000000042c50  4e454e714e714e71
+40  98    207c000000042c50  4e454e714e714e71
+17  aa    42a7487a012a   JMP:hook_setcursor   # kSetCursor x,y: input.device pointer event -> move ST pointer
+# Speed: the 32 per-colour pixel routines (table at data +$1d70) start by writing plane 4, which the
+# ST never shows; enter each routine 4 bytes later.
+1   1d70  -   RELADD:4:32
+# Debug: kernel call trace (KTRACE file in the game folder enables the output)
+4   9ee   4dec87ea2c76   JMP:hook_ktrace
+# Speed: SCI's free handle slot search (linear from the start) -> next-fit
+59  c16   4e55000048e7   JMP:hook_findslot
+# Speed: property lookup in send -> verified lookup cache (resumes at +$23c / +$25e)
+23  22c   342bfffe3602   JMP:hook_proplookup

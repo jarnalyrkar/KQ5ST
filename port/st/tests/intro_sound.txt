@@ -1,0 +1,9 @@
+2500 shot
+4000 press 256 129
+4010 release
+5000 shot
+6500 shot
+8000 shot
+9500 shot
+11000 shot
+12000 quit

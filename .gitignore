@@ -1,0 +1,23 @@
+# Everything in the project root is local unless listed below (original games, emulators,
+# ScummVM checkout, the sluicebox decompiled scripts, scratch screenshots).
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/port/
+!/media/
+
+# port/: generated or copied from the original games (see README "Building from your own copy")
+/port/extracted/
+/port/work/
+/port/previews/
+/port/st/hd/
+/port/st/build/
+/port/dist/
+/port/st/src/lvos.inc
+/port/tools/composing/MYM_V167/
+*.log
+*.out
+/port/st/dbg/prof.txt
+__pycache__/
+*.pyc

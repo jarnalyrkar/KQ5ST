@@ -56,8 +56,9 @@ int stricmp(const char *a, const char *b) { while (*a && lower(*a) == lower(*b))
 char *strcpy(char *d, const char *s) { char *r = d; while ((*d++ = *s++)); return r; }
 char *strcat(char *d, const char *s) { strcpy(d + strlen(d), s); return d; }
 
-/* ---- debug output (Hatari NatFeats, falls back to the console) ------------------------- */
-void nf_print(const char *s) { if (nf_available()) nf_stderr(s); else Cconws(s); }
+/* ---- debug output (Hatari NatFeats; without it only crash reports go to the console) ---- */
+static int console_on;
+void nf_print(const char *s) { if (nf_available()) nf_stderr(s); else if (console_on) Cconws(s); }
 
 static char *put_num(char *o, u32 v, int base, int width, int neg) {
     char t[12]; int n = 0;
@@ -92,6 +93,7 @@ void dbg(const char *fmt, ...) {
 
 void fatal(const char *fmt, ...) {
     char buf[320]; va_list ap; va_start(ap, fmt); vfmt(buf, fmt, ap); va_end(ap);
+    console_on = 1;
     nf_print("FATAL: "); nf_print(buf); nf_print("\n");
     display_shot();
     nf_exit(1);
@@ -121,6 +123,7 @@ static const char *exc_name(int v) {
 void c_exception(u32 *f) {
     /* f: usp, d0-d7, a0-a7, then vector word, then the CPU frame */
     u16 *w = (u16 *)(f + 17); int vec = w[0]; u32 pc;
+    console_on = 1;
     if (vec == 2 || vec == 3) {      /* 68000 group 0 frame: fc.w, addr.l, ir.w, sr.w, pc.l */
         u32 addr = (w[2] << 16) | w[3]; pc = (w[6] << 16) | w[7];
         dbg("\n*** %s at %H (pc $%x), access $%x %s, ir %4x, sr %4x\n", exc_name(vec), pc, pc, addr,
@@ -205,7 +208,10 @@ struct LoaderMsg *loader_msg;
 
 int shim_main(void *bp) {
     (void)bp;
+    extern char nf_illegal[];
+    long old_illegal = Setexc(4, nf_illegal);   /* NatFeats opcodes are illegal without Hatari */
     nf_init();
+    Setexc(4, (void *)old_illegal);
     dbg("KQ5 TOS shim starting; Prog at $%x..$%x\n", (u32)hunk0, (u32)prog_end);
     static const int vecs[] = { 2, 3, 4, 5, 6, 7, 8, 10, 11 };
     void *hs[] = { exc_2, exc_3, exc_4, exc_5, exc_6, exc_7, exc_8, exc_10, exc_11 };

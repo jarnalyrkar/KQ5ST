@@ -427,6 +427,14 @@ nf_available:
 	move.l	nf_stderr_id,%d0
 	rts
 
+| Illegal-instruction handler while probing: without NatFeats (real ST, Steem, Hatari with
+| natfeats off) $7300 traps here; answer id 0 (feature absent) and skip the opcode.
+	.globl	nf_illegal
+nf_illegal:
+	moveq	#0,%d0
+	addq.l	#2,2(%sp)
+	rte
+
 	.globl	nf_init
 nf_init:
 	pea	nf_name_stderr

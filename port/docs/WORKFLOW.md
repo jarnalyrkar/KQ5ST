@@ -58,6 +58,11 @@ see INPUT.md), so they only work while the game polls for events.
 
 ## Reading the log
 
+- The log goes through Hatari NatFeats (`--natfeats yes`; the user's config has `bNatFeats = TRUE`).
+  Without NatFeats (real ST, Steem, Hatari default) `nf_init` catches the illegal `$7300` opcode
+  (`nf_illegal` in glue.S) and the log is silent, except crash reports (`c_exception`, `fatal`),
+  which go to the screen via Cconws. v0.1.0 lacked this and gave 4 bombs at start (2026-10-19).
+  **Test release builds with `--natfeats no` too.**
 - Crashes print `*** bus error at H<hunk>_<offset>` with registers and stack; the disassembly is
   in `work/prog/disasm/hunkNN.s`; `tools/sym.py` resolves shim addresses (`st/hd/KQ5ST.sym`).
 - New AmigaOS calls show up as `FATAL: unimplemented <lib> LVO -n called from H..`; add a

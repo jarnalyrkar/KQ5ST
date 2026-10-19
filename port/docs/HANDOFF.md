@@ -47,6 +47,10 @@ state only; how things work is in the area files.
 - **Copy protection removed** (`SCRIPTS.md`): rooms 22, 30, 216, 220 never call `CPCheck`
   (one `bnt` → `jmp` each), as in the CD release. **Not play-tested** (the rooms are far in).
 
+- **v0.1.0 bombed outside Hatari** (2026-10-19, user + a real-STE/Steem tester): unguarded
+  NatFeats opcode at start-up → 4 bombs. Fixed (WORKFLOW.md "Reading the log"); with NatFeats off the
+  user saw the game start; console debug text then silenced. Next: user re-checks, then release v0.1.1.
+
 ## Known gaps / risks
 
 1. Sound (`SOUND.md`): tempo runs at the VBL rate (50 Hz PAL vs the expected 60 Hz, music 17 %

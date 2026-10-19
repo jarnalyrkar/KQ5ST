@@ -49,7 +49,7 @@ state only; how things work is in the area files.
 
 - **v0.1.0 bombed outside Hatari** (2026-10-19, user + a real-STE/Steem tester): unguarded
   NatFeats opcode at start-up → 4 bombs. Fixed (WORKFLOW.md "Reading the log"); with NatFeats off the
-  user saw the game start; console debug text then silenced. Next: user re-checks, then release v0.1.1.
+  user saw the game start; console debug text then silenced. User confirmed clean; released as v0.1.1 (pre-release, 2026-10-19).
 
 ## Known gaps / risks
 

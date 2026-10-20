@@ -54,7 +54,7 @@ state only; how things work is in the area files.
   "Illegal instruction at $000030". Cause: TOS loaded the program at 2 mod 4, BPTRs broke
   (ARCHITECTURE.md "Longword alignment"). Fixed in `_start` + `elf2prg.py`; reproduced and
   verified with an AHDI image in Hatari (title screen reached), GEMDOS-drive run unchanged.
-  **Not yet released or tried by the user/tester** on real hardware or Steem.
+  Released as v0.1.2 (pre-release, 2026-10-20); **not yet tried by the user/tester** on real hardware or Steem.
 
 ## Known gaps / risks
 

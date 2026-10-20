@@ -89,9 +89,15 @@ handles 64+ instead of 6+). Before a release, also run from an ACSI image with a
         --avirecord --avi-file v.avi                              # frames: ffmpeg -i v.avi -vf fps=1/15 f%02d.png
 
 `acsiput.py` keeps the driver files and adds the folder as a subdirectory (1024-byte logical
-sectors, FAT16). The GEMDOS drive must be off in the config or it takes C:. Start-up is slow
-there: the Sierra logo appears around VBL 6000 instead of ~700, because every missing patch file
-(`Lock("N.scr")`, then `"df3:N.scr"`) is a linear search of the 608-entry folder.
+sectors, FAT16). The GEMDOS drive must be off in the config or it takes C:.
+
+Start-up from such a disk was slow (Sierra logo ~94 s after the desktop in v0.1.2, vs ~14 s on
+the GEMDOS drive): each lookup was a linear search of the 608-entry folder, ~5 VBLs per Lock and
+~15 per Open, and SCI looks up two missing patch names per resource and reopens RESOURCE.000 each
+time (49 opens to the title). The directory cache in `dos.c` (ARCHITECTURE.md) brought it to
+~19 s (2026-10-20). Measure with `--avirecord` and the first non-black frame
+(`ffmpeg -vf fps=1`); the lookup results are logged, so `Lock`/`Open` lines can be diffed
+between builds to check the cache answers as GEMDOS did.
 
 ## Profiling and benchmarks
 

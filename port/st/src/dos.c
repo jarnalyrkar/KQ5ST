@@ -15,7 +15,7 @@
 #define PATHMAX 160
 
 struct Lock { char path[PATHMAX]; int isdir; u8 dta[44]; int scanning; } __attribute__((aligned(4)));
-struct FileHandle { u32 link, port, type, buf, pos, end, funcs, func2, func3; s32 handle; u32 arg2; int console; }
+struct FileHandle { u32 link, port, type, buf, pos, end, funcs, func2, func3; s32 handle; u32 arg2; int console, cached; }
     __attribute__((aligned(4)));
 
 static char root[PATHMAX];        /* e.g. "C:\KQ5" (no trailing backslash) */
@@ -52,9 +52,91 @@ static const char *cur_dir(void) {
     return l ? l->path : root;
 }
 
+/* ---- game-directory cache ------------------------------------------------------------- */
+/* SCI looks for a patch file before every resource (Lock "N.scr", then "df3:N.scr") and opens
+ * RESOURCE.000 again for each one. On a real disk every such GEMDOS lookup searches the ~600-entry
+ * folder linearly (start-up took ~2 min). So the folder's names, attributes and sizes are read
+ * once: lookups of files directly in the game folder are answered from the cache, and a few
+ * read-only handles are kept open for reuse (c_Open/c_Close). Files the game creates or rewrites
+ * are marked "live" (asked from GEMDOS again); deleted ones are dropped. Names are kept in GEMDOS
+ * 8.3 upper-case form. */
+#define DC_MAX  1024
+#define DC_HASH 256
+struct DEnt { char name[13]; u8 attr; u16 next; u16 live; u32 size; };   /* next: index + 1, 0 = end */
+static struct DEnt *dc;
+static u16 dc_head[DC_HASH];
+static int dc_n, dc_ok;
+
+static int norm83(char *out, const char *s) {           /* 0 if not a plain 8.3 name */
+    int n = 0, base = 0, ext = -1;
+    for (; *s; s++) {
+        char c = *s;
+        if (c == '*' || c == '?' || c == '\\' || c == ':') return 0;
+        if (c == '.') { if (ext >= 0 || !base) return 0; ext = 0; out[n++] = '.'; continue; }
+        if (c >= 'a' && c <= 'z') c -= 32;
+        if (ext < 0) { if (base++ < 8) out[n++] = c; }      /* GEMDOS truncates to 8.3 */
+        else if (ext++ < 3) out[n++] = c;
+    }
+    out[n] = 0;
+    return base > 0;
+}
+static int dc_hash(const char *s) { u16 h = 0; while (*s) h = h * 31 + (u8)*s++; return h & (DC_HASH - 1); }
+static struct DEnt *dc_find(const char *n) {
+    for (int i = dc_head[dc_hash(n)]; i; i = dc[i - 1].next) if (!strcmp(dc[i - 1].name, n)) return &dc[i - 1];
+    return 0;
+}
+static struct DEnt *dc_add(const char *n) {               /* n already normalised */
+    struct DEnt *e = dc_find(n);
+    if (e) return e;
+    if (dc_n == DC_MAX) { dc_ok = 0; return 0; }           /* too many: GEMDOS for everything */
+    e = &dc[dc_n++]; int h = dc_hash(n);
+    strcpy(e->name, n); e->attr = 0; e->live = 1; e->size = 0; e->next = dc_head[h]; dc_head[h] = dc_n;
+    return e;
+}
+static void dc_build(void) {
+    u8 dta[44]; char spec[PATHMAX], n[13];
+    dc = mem_alloc(DC_MAX * sizeof *dc, 0); if (!dc) return;
+    dc_ok = 1;
+    Fsetdta(dta); strcpy(spec, root); strcat(spec, "\\*.*");
+    for (long rc = Fsfirst(spec, 0x17); rc == 0 && dc_ok; rc = Fsnext()) {
+        struct DEnt *e = norm83(n, (const char *)dta + 30) ? dc_add(n) : 0;
+        if (e) { e->attr = dta[21]; e->size = (dta[26] << 24) | (dta[27] << 16) | (dta[28] << 8) | dta[29]; e->live = 0; }
+    }
+    dbg("directory cache: %d names%s\n", dc_n, dc_ok ? "" : " (too many, off)");
+}
+/* For a path directly in the game folder: put its normalised name in n and return 1. */
+static int in_root(const char *stpath, char *n) {
+    const char *r = root;
+    while (*r && *r == *stpath) r++, stpath++;
+    if (*r || *stpath != '\\') return 0;
+    for (const char *s = ++stpath; *s; s++) if (*s == '\\') return 0;
+    return dc_ok && norm83(n, stpath);
+}
+
+/* Read-only handles kept open after Close, for files in the game folder (RESOURCE.00x). */
+#define HC_N 6
+static struct { char name[13]; u8 busy; long h; u32 used; } hc[HC_N];
+static u32 hc_clock;
+static void hc_drop(const char *n) {                       /* the file is rewritten or deleted */
+    for (int i = 0; i < HC_N; i++) if (hc[i].h && !strcmp(hc[i].name, n)) {
+        if (hc[i].busy) hc[i].name[0] = 0;                  /* closed by c_Close */
+        else { Fclose(hc[i].h); hc[i].h = 0; }
+    }
+}
+
 static int st_isdir(const char *path, u8 *dta) {
     Fsetdta(dta);
     if (strlen(path) <= 2) return 1;                           /* "C:" */
+    char n[13];
+    if (in_root(path, n)) {
+        struct DEnt *e = dc_find(n);
+        if (!e) return -1;
+        if (!e->live) {                                        /* as Fsfirst would fill the DTA */
+            dta[21] = e->attr; dta[26] = e->size >> 24; dta[27] = e->size >> 16; dta[28] = e->size >> 8; dta[29] = e->size;
+            strcpy((char *)dta + 30, n);
+            return (e->attr & 0x10) ? 1 : 0;
+        }
+    }
     if (Fsfirst(path, 0x17) < 0) return -1;                    /* include dirs/hidden/system */
     return (dta[21] & 0x10) ? 1 : 0;
 }
@@ -156,20 +238,38 @@ void c_Open(R) {
     if (!strcmp(name, "*") || is_device(name, "CON:") || is_device(name, "RAW:") || is_device(name, "NIL:")) {
         r->d[0] = MKBADDR(mode == MODE_OLDFILE ? &con_in : &con_out); return;
     }
-    char p[PATHMAX]; resolve(p, cur_dir(), name);
-    long h = mode == MODE_NEWFILE ? Fcreate(p, 0) : Fopen(p, mode == MODE_OLDFILE ? 0 : 2);
+    char p[PATHMAX], n[13]; resolve(p, cur_dir(), name);
+    int root_file = in_root(p, n), slot = -1;
+    long h = -1;
+    if (root_file && mode == MODE_OLDFILE) {
+        for (int i = 0; i < HC_N && slot < 0; i++)
+            if (hc[i].h && !hc[i].busy && !strcmp(hc[i].name, n)) { slot = i; h = hc[i].h; Fseek(0, h, 0); }
+        if (slot < 0 && !dc_find(n)) h = -33;                  /* known missing */
+    }
+    if (root_file && mode != MODE_OLDFILE) hc_drop(n);
+    if (slot < 0 && h != -33) h = mode == MODE_NEWFILE ? Fcreate(p, 0) : Fopen(p, mode == MODE_OLDFILE ? 0 : 2);
     if (h < 0 && mode == MODE_READWRITE) h = Fcreate(p, 0);
-    dbg("Open(\"%s\", %d) -> %s h=%d\n", name, mode, p, h);
+    dbg("Open(\"%s\", %d) -> %s h=%d%s\n", name, mode, p, h, slot >= 0 ? " (kept open)" : "");
     if (h < 0) { r->d[0] = 0; last_error = ERROR_OBJECT_NOT_FOUND; return; }
+    if (root_file && mode != MODE_OLDFILE) { struct DEnt *e = dc_add(n); if (e) e->live = 1; }   /* may be new */
+    if (root_file && mode == MODE_OLDFILE && slot < 0) {      /* take a free or the least recently used slot */
+        for (int i = 0; i < HC_N; i++)
+            if (!hc[i].busy && (slot < 0 || !hc[i].h || (hc[slot].h && hc[i].used < hc[slot].used))) slot = i;
+        if (slot >= 0) { if (hc[slot].h) Fclose(hc[slot].h); hc[slot].h = h; strcpy(hc[slot].name, n); }
+    }
+    if (slot >= 0) { hc[slot].busy = 1; hc[slot].used = ++hc_clock; }
     struct FileHandle *fh = mem_alloc(sizeof *fh, 0x10000);
-    fh->handle = h; fh->type = 0;
+    fh->handle = h; fh->type = 0; fh->cached = slot + 1;
     r->d[0] = MKBADDR(fh);
 }
 
 void c_Close(R) {
     struct FileHandle *fh = BADDR(r->d[1]);
     if (!fh || fh->console) return;
-    Fclose(fh->handle); mem_free(fh, sizeof *fh);
+    int i = fh->cached - 1;
+    if (i >= 0) { hc[i].busy = 0; if (!hc[i].name[0]) { Fclose(hc[i].h); hc[i].h = 0; } }
+    else Fclose(fh->handle);
+    mem_free(fh, sizeof *fh);
 }
 
 void c_Read(R) {
@@ -196,7 +296,8 @@ void c_Seek(R) {
 }
 
 void c_DeleteFile(R) {
-    char p[PATHMAX]; resolve(p, cur_dir(), (const char *)r->d[1]);
+    char p[PATHMAX], n[13]; resolve(p, cur_dir(), (const char *)r->d[1]);
+    if (in_root(p, n)) { hc_drop(n); struct DEnt *e = dc_find(n); if (e) e->name[0] = 0; }   /* now missing */
     r->d[0] = Fdelete(p) == 0 ? -1 : 0;
 }
 
@@ -231,6 +332,7 @@ void dos_init(void) {
     Dgetpath(root + 2, drv + 1);
     int n = strlen(root); if (n > 2 && root[n - 1] == '\\') root[n - 1] = 0;
     dbg("game directory: %s\n", root);
+    dc_build();
     con_in.console = con_out.console = 1; con_in.port = con_out.port = 1;
 
     DOSBase = make_library("dos.library", 40, 0x40);

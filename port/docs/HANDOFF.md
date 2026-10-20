@@ -58,9 +58,10 @@ state only; how things work is in the area files.
 
 ## Known gaps / risks
 
-0. Start-up from a real hard disk is slow (logo at ~VBL 6000 in Hatari's ACSI emulation): every
-   missing patch file is searched for twice in a 608-file folder (WORKFLOW.md "Real hard-disk
-   test"). A cached directory listing in `dos.c` would fix it.
+0. Start-up from a real hard disk was slow (~94 s black screen in Hatari's ACSI emulation);
+   the directory cache and kept-open handles in `dos.c` (2026-10-20) cut it to ~19 s, lookup
+   results identical. **Save/restore with the cache not yet tested** (autoplay cannot press
+   dialog buttons): user to save, restore and overwrite a save in `play.sh`. Not released yet.
 
 1. Sound (`SOUND.md`): tempo runs at the VBL rate (50 Hz PAL vs the expected 60 Hz, music 17 %
    slow); no noise/percussion; sounds without a `$13` track are silent.

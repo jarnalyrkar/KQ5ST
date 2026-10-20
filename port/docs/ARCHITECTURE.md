@@ -17,7 +17,7 @@ EGA art substituted through SCI patch files (GRAPHICS.md). Prog runs in supervis
 | `st/src/glue.S` | entry, `run_prog` (Super mode, AmigaDOS-style start), LVO stub macro, trap #5, VBL dispatch, IKBD byte entry (`ikbd_handler`) and mouse packet handler, silent sound driver (`NOSND` file), `HOOK` macro |
 | `st/src/shim.c` | hooks into Prog (kernel trace, GetEvent poll, ...) |
 | `st/src/exec.c` | exec.library: libraries with real jump tables, process "SCI", ports, signals, interrupts, tasks (recorded, not run) |
-| `st/src/dos.c` | dos.library on GEMDOS; AmigaDOS paths resolved against the start directory |
+| `st/src/dos.c` | dos.library on GEMDOS; AmigaDOS paths resolved against the start directory; cache of the game folder (names, attributes, sizes; files written are re-asked from GEMDOS) and 6 kept-open read-only handles, for real-disk speed |
 | `st/src/display.c` | graphics/intuition stand-ins; Amiga 5-plane bitmap → ST 4-plane screen conversion; pointer; screenshots (GRAPHICS.md) |
 | `st/src/blit.c` | rectangle engine and Graph priority/control fill: STE blitter or CPU (GRAPHICS.md) |
 | `st/src/blitter.c` | STE blitter access (detected with Blitmode, shared-bus restart loop) |

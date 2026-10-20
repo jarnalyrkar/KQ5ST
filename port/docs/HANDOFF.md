@@ -34,7 +34,8 @@ state only; how things work is in the area files.
   yet checked by the user** in the desert.
 - **Double-click walk skip removed** (2026-10-20, user request: caused bugs, and the game is
   about the journey). Shim no longer flags double-clicks; `996.SCR` keeps only the title-skip
-  hook (`INPUT.md`, `SCRIPTS.md`).
+  hook (`INPUT.md`, `SCRIPTS.md`). Released as v0.1.4 (pre-release, 2026-10-20); restoring saves made with
+  v0.1.3 or earlier not tested.
 - **Keypad as in the manual** (`INPUT.md`, `SCRIPTS.md`): the shim posts PC keypad key codes and
   the original game logic does the rest (digits move the pointer or, with the walk cursor, walk
   Graham; 5 cycles the cursors; keypad 0 = Insert toggles walk/last cursor; keypad . = Delete

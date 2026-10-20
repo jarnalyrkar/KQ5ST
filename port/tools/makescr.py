@@ -40,40 +40,6 @@ SEL_eachElementDo, SEL_dispose = 115, 107
 G_curRoom, G_cast, G_roomNumber, G_titleMusic = 2, 5, 11, 397
 ROOM_TITLE = 119
 PROP_mover = 100
-DBLCLICK = 0x80         # modifiers bit the ST shim sets on the second click of a double-click
-
-def ego_handle_event(orig):
-    """Ego::handleEvent (script 996) with double-click fast-forward: after `self setMotion: ...`
-    (offset $520-$413 in the method), if the event's modifiers carry the double-click bit, run
-    `(self doit)` until the mover is gone (or 1000 iterations), i.e. walk the whole way at once.
-    The 7 bytes `pushi prevDir; push1; push0; lag 80` at +$10d are replaced by a jmp to a
-    trampoline appended after the method; the trampoline runs the new code, then those 7 bytes,
-    then jumps back."""
-    hook = 0x520 - 0x413
-    replaced = orig[hook:hook + 7]
-    assert replaced == bytes.fromhex('383a01' '78' '76' '8150'), replaced.hex()
-    back = hook + 7
-    tramp = len(orig)
-    code = bytearray(orig)
-    code[hook:hook + 7] = jmp(tramp - (hook + 3)) + b'\0' * 4
-    t = bytearray()
-    t += pushi(SEL_modifiers) + PUSH0 + lap(1) + send(4) + PUSH + ldi(DBLCLICK) + AND
-    t += bnt(0)                     # -> SKIP (fixed below)
-    fix1 = len(t) - 2
-    t += ldi(1000) + sat(0)
-    loop = len(t)
-    t += pToa(PROP_mover) + bnt(0)  # no mover -> SKIP
-    fix2 = len(t) - 2
-    t += pushi(SEL_doit) + PUSH0 + self_(4)
-    t += dec_at(0) + bnt(0)         # counter exhausted -> SKIP
-    fix3 = len(t) - 2
-    t += jmp(loop - (len(t) + 3))
-    skip = len(t)
-    for f in (fix1, fix2, fix3): t[f:f + 2] = struct.pack('<h', skip - (f + 2))
-    t += replaced
-    t += jmp(back - (tramp + len(t) + 3))
-    return bytes(code + t)
-
 def user_handle_event_hook(replaced):
     """Trampoline hooked into the start of User::handleEvent (script 996): Esc (or both mouse
     buttons, which the ST shim turns into Esc) in the title room 119 skips the Sierra fanfare
@@ -174,10 +140,7 @@ PATCHES = [
     # keeps its speed 3).
     (202, 0x4f6, b'\x38\xd8\x00\x78\x39\x03\x38\x93\x00', b'\x38\xd8\x00\x78\x39\x00\x38\x93\x00'),
 ]
-METHODS = [
-    # Double-click to skip the walk (see docs/SCRIPTS.md).
-    (996, 0x556, 128, ego_handle_event),      # class Ego, handleEvent
-]
+METHODS = []
 HOOKS = [
     # Esc skips the Sierra fanfare / the title song (see user_handle_event_hook).
     (996, 0x08f, 7, user_handle_event_hook),  # User::handleEvent: link 2; pushi 4; push0; lap 1

@@ -31,8 +31,7 @@ the port takes the shipped Amiga version and makes it run on TOS:
   resolution), merged into the Amiga resources so the Amiga game scripts still work.
 - **Sound** goes through a new YM2149 driver that plays the music data the Amiga version
   shipped for 3-voice hardware.
-- Small **script patches** fix speed, add a double-click to skip walking and mouse-only title
-  skips, map the keypad as in the PC manual, and remove the copy protection (as in the later CD
+- Small **script patches** fix speed, add mouse-only title skips, map the keypad as in the PC manual, and remove the copy protection (as in the later CD
   release).
 
 It runs in Hatari (STE, TOS 1.62, 4 MB) and has been play-tested from the opening through the town,

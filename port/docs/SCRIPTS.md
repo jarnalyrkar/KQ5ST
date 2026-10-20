@@ -25,8 +25,7 @@ and bytecode of a script (selector names from vocab 997, kernel names from vocab
 `@hex` as the filter disassembles code at any offset (`scidisasm.py res 996 @0894`), e.g. to
 check a trampoline. To disassemble a generated `N.SCR`, strip the 2-byte header and symlink the
 `vocab` folder next to a folder holding it. Its load/store opcode names were wrong before
-2026-10-17 (`lsg` printed as `lagi`); fixed. The SCI `modifiers` word reaches scripts unmasked
-(used by the double-click patch).
+2026-10-17 (`lsg` printed as `lagi`); fixed. The SCI `modifiers` word reaches scripts unmasked.
 
 ## Decompiled Amiga scripts
 
@@ -73,14 +72,10 @@ Short moves (battle 124, castle cat, rm067 at 1037, spiderRegion) are left alone
   `egoMoveSpeed` into ego. With the default 2 Graham only stepped every third game cycle, which at
   8 cycles/s is a crawl; 0 (slider at the top, "100 %") makes him step every cycle. Saved games
   carry their own value; the default applies to new and restarted games.
-- **Double-click skips the walk** - script 996 `Ego::handleEvent` (`METHODS`). The shim sets
-  modifier bit `$80` (unused by SCI) on the second left-button press within 25 VBLs and 4 pixels
-  of the previous one (`input.c`, `DBLCLICK`, INPUT.md). The patched handler, after the normal
-  `self setMotion: PolyPath x y`, runs `(self doit)` in a loop until `mover` is 0 (at most 1000
-  iterations), so Graham arrives in one game cycle; obstacles are honoured because it is the
-  ordinary mover that runs. A double-click at a screen edge therefore changes room at once
-  (`Ego::doit` sets `edgeHit`, `Rm::doit` calls `newRoom`). 7 bytes after the `setMotion` send
-  are replaced by the `jmp` to the trampoline. User-tested.
+- **Double-click walk skip: removed** (2026-10-20, user request). It replaced `Ego::handleEvent`
+  (script 996) via `METHODS` to run the mover to completion in one cycle; it caused bugs and
+  went against the pace of the game. `METHODS` is now empty (the machinery stays); git history
+  has the old builder `ego_handle_event`.
 - **Title skips** - script 996 `User::handleEvent` (`HOOKS`): Esc skips the Sierra fanfare and the
   title song. The game starts in room 99 (a one-second speed test, `fred` = view 99), then room
   119 (`kq5Title`, script `animScript`): states 0-7 play sound 500 (the fanfare), draw pic 106

@@ -19,9 +19,9 @@ posted into Prog's event queue from the poll hook inside GetEvent. The autoplay 
   FerretTask did). The mouse packet handler does that.
 - kSetCursor with a position moved the pointer via input.device on the Amiga; hooked (hunk 17
   `+$aa`) so the pointer moves on the ST too.
-- Double-click (`DBLCLICK`): the second left-button press within 25 VBLs and 4 pixels of the
-  previous one gets modifier bit `$80` (unused by SCI); the patched `Ego::handleEvent`
-  (SCRIPTS.md) turns it into "walk there at once". User-tested.
+- No double-click: an earlier "double-click skips the walk" feature (modifier bit `$80` on the
+  second click, plus a patched `Ego::handleEvent`) was removed on 2026-10-20 at the user's request
+  (it caused bugs here and there, and the game is about the journey).
 - Both mouse buttons held together post an Esc key event (`mouse_buttons_changed`), so the mouse
   alone can skip the title sequence (SCRIPTS.md "Title skips"); in the game Esc opens the icon bar.
 - The video driver's pointer show/hide counter is ignored (pointer always drawn, HANDOFF gap 6).

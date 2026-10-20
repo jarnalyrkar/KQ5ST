@@ -32,9 +32,9 @@ state only; how things work is in the area files.
   desert chirp (region script 15), was a fast high chatter on the YM; `st/hd/3.snd` drops its
   `$13` track (a first try on sound 16 was the bees of room 11, undone). **Not
   yet checked by the user** in the desert.
-- **Double-click skips the walk** (`INPUT.md`, `SCRIPTS.md`): shim flags the second click
-  (modifier `$80`), patched `Ego::handleEvent` (`996.SCR`) runs the mover to completion in one
-  cycle; a double-click at a screen edge changes room at once. User-tested.
+- **Double-click walk skip removed** (2026-10-20, user request: caused bugs, and the game is
+  about the journey). Shim no longer flags double-clicks; `996.SCR` keeps only the title-skip
+  hook (`INPUT.md`, `SCRIPTS.md`).
 - **Keypad as in the manual** (`INPUT.md`, `SCRIPTS.md`): the shim posts PC keypad key codes and
   the original game logic does the rest (digits move the pointer or, with the walk cursor, walk
   Graham; 5 cycles the cursors; keypad 0 = Insert toggles walk/last cursor; keypad . = Delete

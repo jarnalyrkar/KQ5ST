@@ -69,28 +69,13 @@ static void queue_event(int type, int message, int mods) {
     __asm__ volatile("move.w %0,%%sr" : : "d"(sr) : "memory");
 }
 
-/* Double-click: a second left-button press within DBL_TICKS VBLs and DBL_DIST pixels of the
- * previous one gets modifier bit DBLCLICK (unused by SCI); the patched Ego::handleEvent
- * (tools/makescr.py) then walks Graham to the spot in one go. */
-#define DBLCLICK  0x80
-#define DBL_TICKS 25
-#define DBL_DIST  4
-static u32 last_down; static s16 last_dx, last_dy;
-static int double_click(void) {
-    u32 now = vbl_count; int dbl = 0;
-    int dx = mouse_x - last_dx, dy = mouse_y - last_dy;
-    if (last_down && now - last_down <= DBL_TICKS && dx <= DBL_DIST && dx >= -DBL_DIST && dy <= DBL_DIST && dy >= -DBL_DIST) dbl = 1;
-    last_down = dbl ? 0 : now; last_dx = mouse_x; last_dy = mouse_y;
-    return dbl;
-}
-
 /* Called from the IKBD mouse handler (glue.S) when the button bits change. Both buttons held
  * together = Esc (bit 1 left, bit 0 right): skips the Sierra fanfare / title song (script patch in
  * tools/makescr.py) and otherwise does what Esc does (opens the icon bar). */
 void mouse_buttons_changed(u8 old, u8 new) {
     int mods = cur_mods;
     if ((new & 3) == 3 && (old & 3) != 3) queue_event(EV_KEYDOWN, 27, mods);
-    if ((new & 2) && !(old & 2)) queue_event(EV_MOUSEDOWN, 0, mods | (double_click() ? DBLCLICK : 0));
+    if ((new & 2) && !(old & 2)) queue_event(EV_MOUSEDOWN, 0, mods);
     if (!(new & 2) && (old & 2)) queue_event(EV_MOUSEUP, 0, mods);
     if ((new & 1) && !(old & 1)) queue_event(EV_MOUSEDOWN, 0, mods | 3);     /* right = shift-click */
     if (!(new & 1) && (old & 1)) queue_event(EV_MOUSEUP, 0, mods | 3);
@@ -222,9 +207,6 @@ static void auto_step(void) {
             mouse_x = parse_num(&p); mouse_y = parse_num(&p);
             int m = cmd[0] == 'r' ? mods | 3 : mods;
             queue_event(EV_MOUSEDOWN, 0, m); queue_event(EV_MOUSEUP, 0, m);
-        } else if (!strcmp(cmd, "dclick")) {
-            mouse_x = parse_num(&p); mouse_y = parse_num(&p);
-            queue_event(EV_MOUSEDOWN, 0, mods | DBLCLICK); queue_event(EV_MOUSEUP, 0, mods);
         } else if (!strcmp(cmd, "key")) queue_event(EV_KEYDOWN, parse_num(&p), mods);
         else if (!strcmp(cmd, "dir")) queue_event(EV_DIRECTION, parse_num(&p), mods);
         else if (!strcmp(cmd, "ikbd")) ikbd_byte(parse_num(&p) & 0xff);

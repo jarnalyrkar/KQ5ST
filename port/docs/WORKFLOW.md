@@ -34,7 +34,7 @@ swallows keypad 8/5/4/6 before they reach the ST (see INPUT.md).
 ## Test automation (autoplay scripts)
 
 A script passed to `run.sh` (copied to `st/hd/AUTO.TXT`) has one command per line, time in
-VBLs since start-up: `click x y`, `rclick x y`, `dclick x y` (double-click), `press x y`,
+VBLs since start-up: `click x y`, `rclick x y`, `press x y`,
 `release`, `move x y`, `key code`, `dir n` (direction event), `ikbd byte` (raw IKBD byte through
 the keyboard decoder, e.g. `$68`/`$e8` = keypad 8 down/up), `shot`, `quit`, `profreset`, `prof`
 (PC-sample profile + game cycles/s). Example (skip the cartoon, walk, open the icon bar):
@@ -48,7 +48,7 @@ the keyboard decoder, e.g. `$68`/`$e8` = keypad 8 down/up), `shot`, `quit`, `pro
 Scripts in `st/tests/`: `skip_walk.txt`, `settings.txt` (opens the settings panel), `numpad.txt`
 (keypad key codes through the IKBD decoder), `numpad_walk.txt`, `walk_shots.txt` (walk to a point,
 5 timed shots: compare Graham's position between builds), `walk_long.txt`, `walk_prof.txt`,
-`bench_walk.txt` (speed benchmark), `dclick.txt`, `intro_sound.txt` (12000 VBLs, shots during
+`bench_walk.txt` (speed benchmark), `intro_sound.txt` (12000 VBLs, shots during
 the intro), `title_skip.txt` / `title_skip_mouse.txt` (Esc / both mouse buttons skip the Sierra
 logo and the title song; run with 3100 VBLs, expect `DrawPic 107` right after the first press and
 the "played before?" box in the shot after the second).
@@ -124,8 +124,7 @@ between builds to check the cache answers as GEMDOS did.
 - Runs that get further stall once the game reaches Crispin's house after the skipped cartoon
   (~VBL 4500, sometimes as early as VBL ~1700): `c_input_poll` is no longer called, so later
   autoplay events, `shot` and `quit` do nothing (also with the silent driver). The older walk
-  tests (`skip_walk.txt`, `walk_shots.txt`) therefore no longer exercise walking and `dclick.txt`
-  could not be verified headless. Input polls are reliable from about VBL 700 (Sierra logo) to
+  tests (`skip_walk.txt`, `walk_shots.txt`) therefore no longer exercise walking. Input polls are reliable from about VBL 700 (Sierra logo) to
   ~1600, which is where `numpad.txt` runs its checks. 2026-10-17 afternoon: six 2600-VBL runs
   (with `KTRACE` or `YM_TRACE`) all stopped at VBL ~1330, in the middle of the Sierra fanfare,
   after an ordinary cast-list walk (FirstNode/NextNode/NodeValue/IsObject), identical with two

@@ -60,8 +60,8 @@ state only; how things work is in the area files.
 
 0. Start-up from a real hard disk was slow (~94 s black screen in Hatari's ACSI emulation);
    the directory cache and kept-open handles in `dos.c` (2026-10-20) cut it to ~19 s, lookup
-   results identical. **Save/restore with the cache not yet tested** (autoplay cannot press
-   dialog buttons): user to save, restore and overwrite a save in `play.sh`. Not released yet.
+   results identical. User tested save, restore, overwrite and restore again in `play.sh`
+   (2026-10-20). Released as v0.1.3 (pre-release, 2026-10-20); not yet tried on real hardware.
 
 1. Sound (`SOUND.md`): tempo runs at the VBL rate (50 Hz PAL vs the expected 60 Hz, music 17 %
    slow); no noise/percussion; sounds without a `$13` track are silent.

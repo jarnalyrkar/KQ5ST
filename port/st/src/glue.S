@@ -4,12 +4,53 @@
 	.globl	_start
 _start:
 	move.l	4(%sp),%a0		| basepage
-	move.l	%a0,basepage
+| AmigaDOS BPTRs (address >> 2) need longword-aligned code and data, but TOS only word-aligns the
+| program: under a real hard-disk driver it can load at 2 mod 4 (Hatari's GEMDOS drive happens
+| to give 0 mod 4). Then move the image (text+data+bss) up 2 bytes and add 2 to every relocated
+| long, using the copy of the fixup table elf2prg puts in .data (reloc_copy, TOS's format).
+| Nothing absolute may be used before this.
+	move.l	8(%a0),%a1		| p_tbase
+	move.l	%a1,%d0
+	btst	#1,%d0
+	beq.s	3f
+	move.l	0xc(%a0),%d0		| p_tlen + p_dlen + p_blen (multiples of 4)
+	add.l	0x14(%a0),%d0
+	add.l	0x1c(%a0),%d0
+	add.l	%d0,%a1			| source end
+	lea	2(%a1),%a2		| destination end
+	lsr.l	#1,%d0			| words
+	move.l	#0x66fa4e75,-(%sp)	| mover on the stack (the image moves under it):
+	move.l	#0x35215380,-(%sp)	| 1: move.w -(a1),-(a2); subq.l #1,d0; bne.s 1b; rts
+	lea	1f(%pc),%a3
+	addq.l	#2,%a3			| return into the moved copy
+	move.l	%a3,-(%sp)
+	jmp	4(%sp)
+1:	addq.l	#8,%sp
+	addq.l	#2,8(%a0)		| p_tbase, p_dbase, p_bbase
+	addq.l	#2,0x10(%a0)
+	addq.l	#2,0x18(%a0)
+	move.l	8(%a0),%a3
+	lea	reloc_copy,%a1		| relocated by TOS for the old base
+	addq.l	#2,%a1
+	move.l	(%a1)+,%d0		| first fixup offset (0 = none)
+	beq.s	3f
+	add.l	%d0,%a3
+2:	addq.l	#2,(%a3)
+4:	moveq	#0,%d0
+	move.b	(%a1)+,%d0
+	beq.s	3f
+	cmp.b	#1,%d0
+	bne.s	5f
+	lea	254(%a3),%a3
+	bra.s	4b
+5:	add.l	%d0,%a3
+	bra.s	2b
+3:	move.l	%a0,basepage
 	lea	stack_top,%sp
 	move.l	0xc(%a0),%d0		| p_tlen
 	add.l	0x14(%a0),%d0		| p_dlen
 	add.l	0x1c(%a0),%d0		| p_blen
-	add.l	#0x100,%d0		| basepage itself
+	add.l	#0x102,%d0		| basepage itself, +2 if the image was moved
 	move.l	%d0,-(%sp)
 	move.l	%a0,-(%sp)
 	clr.w	-(%sp)

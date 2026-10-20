@@ -76,6 +76,23 @@ see INPUT.md), so they only work while the game polls for events.
 - `YM_TRACE 1` in `st/src/ym.c` logs every sound-driver call (SOUND.md).
 - Game scripts: `tools/scidisasm.py extracted/res_amiga N [method|@hexoffset]` (SCRIPTS.md).
 
+## Real hard-disk test (TOS GEMDOS instead of Hatari's)
+
+Hatari's GEMDOS drive (`--harddrive`) differs from real hardware (load address alignment, speed,
+handles 64+ instead of 6+). Before a release, also run from an ACSI image with a real driver:
+
+    cp ../Steem.SSE.4.2.0.Linux64/ACSI/SH204.img hd.img          # AHDI 6.061, empty
+    python3 -I tools/acsiput.py hd.img <unpacked release>/KQ5ST KQ5ST
+    sed 's/^bUseHardDiskDirectory = TRUE/bUseHardDiskDirectory = FALSE/' ~/.config/hatari/hatari.cfg > acsi.cfg
+    hatari --configfile acsi.cfg --natfeats yes --machine ste --acsi 0=hd.img \
+        --auto 'C:\KQ5ST\KQ5ST.PRG' --fast-forward yes --sound off --run-vbls 9000 \
+        --avirecord --avi-file v.avi                              # frames: ffmpeg -i v.avi -vf fps=1/15 f%02d.png
+
+`acsiput.py` keeps the driver files and adds the folder as a subdirectory (1024-byte logical
+sectors, FAT16). The GEMDOS drive must be off in the config or it takes C:. Start-up is slow
+there: the Sierra logo appears around VBL 6000 instead of ~700, because every missing patch file
+(`Lock("N.scr")`, then `"df3:N.scr"`) is a linear search of the 608-entry folder.
+
 ## Profiling and benchmarks
 
 - Benchmark: `st/run.sh 9000 st/tests/bench_walk.txt` (Graham walking, game cycles/s printed by

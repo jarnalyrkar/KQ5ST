@@ -13,7 +13,7 @@ EGA art substituted through SCI patch files (GRAPHICS.md). Prog runs in supervis
 | File | Role |
 |---|---|
 | `tools/hunk2gas.py` | Prog hunks → GNU as source; relocations become symbol references; applies `st/patches/prog.patch` |
-| `tools/elf2prg.py` | links twice (base 0 / base $1000000), diffs to find fixups, writes the TOS PRG and a symbol file |
+| `tools/elf2prg.py` | links twice (base 0 / base $1000000), diffs to find fixups, writes the TOS PRG and a symbol file; also copies the fixup table into `.data` (`reloc_copy`) |
 | `st/src/glue.S` | entry, `run_prog` (Super mode, AmigaDOS-style start), LVO stub macro, trap #5, VBL dispatch, IKBD byte entry (`ikbd_handler`) and mouse packet handler, silent sound driver (`NOSND` file), `HOOK` macro |
 | `st/src/shim.c` | hooks into Prog (kernel trace, GetEvent poll, ...) |
 | `st/src/exec.c` | exec.library: libraries with real jump tables, process "SCI", ports, signals, interrupts, tasks (recorded, not run) |
@@ -28,6 +28,16 @@ EGA art substituted through SCI patch files (GRAPHICS.md). Prog runs in supervis
 The TOS `.PRG` format also uses absolute 32-bit relocation, so the hunks are concatenated into
 TEXT/DATA/BSS with a merged fixup table. GCC's m68k ABI returns pointers in a0 (all TOS wrappers
 copy d0 to a0).
+
+**Longword alignment (v0.1.1 crash on real hardware/Steem, fixed 2026-10-20).** AmigaDOS BPTRs
+(address >> 2: `LoadSeg`'s seglist, locks, file handles) need longword-aligned objects, and the
+static ones (`ym_seg`, `silent_seg`, `con_in`/`con_out`) sit in the image. TOS only word-aligns
+the program: Hatari's GEMDOS drive happened to give 0 mod 4 (`$1ac40`), TOS's own GEMDOS on an
+AHDI disk gave 2 mod 4 (`$1e542`). Prog then called the sound driver 2 bytes off, re-ran its own
+start-up a few times (repeated "SCIport created") and ended in a jump to 0, where the ROM's
+`bra.s $30` gives "illegal instruction at $000030". `_start` (glue.S) now moves the image up 2
+bytes when needed and re-applies the fixups from `reloc_copy` (mover runs on the stack). Reproduce
+with `tools/acsiput.py` (WORKFLOW.md "Real hard-disk test").
 
 ## Prog patches (`st/patches/prog.patch`)
 

@@ -50,8 +50,17 @@ state only; how things work is in the area files.
 - **v0.1.0 bombed outside Hatari** (2026-10-19, user + a real-STE/Steem tester): unguarded
   NatFeats opcode at start-up → 4 bombs. Fixed (WORKFLOW.md "Reading the log"); with NatFeats off the
   user saw the game start; console debug text then silenced. User confirmed clean; released as v0.1.1 (pre-release, 2026-10-19).
+- **v0.1.1 crashed on real hardware and Steem** (2026-10-20): black screen with pointer, then
+  "Illegal instruction at $000030". Cause: TOS loaded the program at 2 mod 4, BPTRs broke
+  (ARCHITECTURE.md "Longword alignment"). Fixed in `_start` + `elf2prg.py`; reproduced and
+  verified with an AHDI image in Hatari (title screen reached), GEMDOS-drive run unchanged.
+  **Not yet released or tried by the user/tester** on real hardware or Steem.
 
 ## Known gaps / risks
+
+0. Start-up from a real hard disk is slow (logo at ~VBL 6000 in Hatari's ACSI emulation): every
+   missing patch file is searched for twice in a 608-file folder (WORKFLOW.md "Real hard-disk
+   test"). A cached directory listing in `dos.c` would fix it.
 
 1. Sound (`SOUND.md`): tempo runs at the VBL rate (50 Hz PAL vs the expected 60 Hz, music 17 %
    slow); no noise/percussion; sounds without a `$13` track are silent.

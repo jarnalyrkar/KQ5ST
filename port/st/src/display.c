@@ -24,6 +24,7 @@ CHECK(ViewPort, rasinfo, 0x24);
 /* ---- ST screen ------------------------------------------------------------------------------ */
 static u8 *st_screen;               /* 32000 bytes, 256-aligned */
 static u8 *old_phys;
+static int old_rez;
 static u16 st_palette[16], old_palette[16];
 static void splash_update(void);
 static struct BitMap *shown;        /* bitmap of the open screen */
@@ -170,6 +171,7 @@ static void display_open(struct BitMap *bm) {
         u8 *m = mem_alloc(32000 + 256, 0x10000);
         st_screen = (u8 *)(((u32)m + 255) & ~255UL);
         old_phys = (u8 *)Physbase();
+        old_rez = Getrez();
         Supexec(save_palette_hw);
         /* The loader splash is shown before the game's first LoadRGB4; until then the hardware
          * palette is TOS's default (colour 0 white), so start with a black screen and palette.
@@ -297,5 +299,5 @@ void display_restore(void) {
     if (!st_screen) return;
     for (int i = 0; i < 16; i++) st_palette[i] = old_palette[i];
     Supexec(set_palette_hw);
-    Setscreen((long)old_phys, (long)old_phys, -1);
+    Setscreen((long)old_phys, (long)old_phys, old_rez);
 }

@@ -58,6 +58,8 @@ static void hw_init(void) {
     int_on(sr);
 }
 
+long ym_silence(void) { hw_init(); return 0; }   /* shim exit, through Supexec */
+
 /* level 0 = silent (tone disabled too) */
 static void hw_voice(int v, u16 period, u8 level) {
     u8 mixer = level ? (hw_mixer & ~(1 << v)) : (hw_mixer | (1 << v));

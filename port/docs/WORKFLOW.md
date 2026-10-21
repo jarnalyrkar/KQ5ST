@@ -62,7 +62,11 @@ see INPUT.md), so they only work while the game polls for events.
   Without NatFeats (real ST, Steem, Hatari default) `nf_init` catches the illegal `$7300` opcode
   (`nf_illegal` in glue.S) and the log is silent, except crash reports (`c_exception`, `fatal`),
   which go to the screen via Cconws. v0.1.0 lacked this and gave 4 bombs at start (2026-10-19).
-  **Test release builds with `--natfeats no` too.**
+  **Assume NatFeats is off (user's rule, 2026-10-21):** players run real STs and Steem, so a
+  behaviour only counts as verified when it was checked with `--natfeats no` (video via
+  `--avirecord`, or the screen). NatFeats is a logging aid only; its `nf_exit` ends Hatari at once
+  and hid the Quit crash (ARCHITECTURE.md "Interrupts and timing"). Never rely on it for control
+  flow.
 - Crashes print `*** bus error at H<hunk>_<offset>` with registers and stack; the disassembly is
   in `work/prog/disasm/hunkNN.s`; `tools/sym.py` resolves shim addresses (`st/hd/KQ5ST.sym`).
 - New AmigaOS calls show up as `FATAL: unimplemented <lib> LVO -n called from H..`; add a
@@ -133,7 +137,11 @@ between builds to check the cache answers as GEMDOS did.
   `quit` autoplay command (`printf '2700 quit\n' > st/hd/AUTO.TXT`, then Hatari with run.sh's
   other options from `st/hd`), went through the whole fanfare at the first attempt (`YM_TRACE`
   events up to VBL 1690). So prefer a `quit` command over `--run-vbls` for headless runs.
-- The settings panel ignores autoplay `press`/`click` (its loop does not go through the poll hook).
+- The settings panel ignores autoplay `press`/`click` (its loop does not go through the poll hook),
+  but `move x y` onto a button then `key 13` works: `tests/restore.txt` (restores the first save listed in `KQ5sg.dir`)
+  and `tests/quit.txt` (Quit; run with `--natfeats no --avirecord` and check the last frames show the
+  desktop). The "played before?" Yes button is at 183,52 (straight to room 1, skipping the cartoon);
+  F7 restore only works in the game's debug mode.
 - Headless runs with Hatari sound enabled (`--sound 44100`, needed for an AVI/wav capture) stall
   right after `AddIntServer` (2 file opens, no further progress), also with the silent `NOSND`
   driver, whatever the fast-forward, buffer or mixing setting. `run.sh`'s `--sound off` placed

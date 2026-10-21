@@ -15,6 +15,8 @@
 55  1a9c  347c00004eac83aa  303c00104e714e71
 # NULL-pointer reads that are harmless on the Amiga (ROM/low memory) but fault on the ST
 23  534   082d0000000b   JMP:hook_isobject    # IsObject: check pointer before reading the magic word
+59  9ea   4e55fffc206d   JMP:hook_hpurgeflag  # handle header flags: skip purged handles
+59  a0c   4e55fffa206d   JMP:hook_hlockflag   #   (DoSound after restoring a save in room 11)
 # Input: joystick poll (reads JOY1DAT/CIA) -> ST mouse + keyboard event source
 16  160   4e55ffda426d   JMP:stub_input_poll
 # "movea.l #4,a0; movea.l (a0),a6" (mouse position helpers) -> trap #5

@@ -57,6 +57,14 @@ state only; how things work is in the area files.
   verified with an AHDI image in Hatari (title screen reached), GEMDOS-drive run unchanged.
   Released as v0.1.2 (pre-release, 2026-10-20); **not yet tried by the user/tester** on real hardware or Steem.
 
+- **Two player bug reports fixed** (2026-10-21, not released yet): (1) restoring a save in the
+  bee/bear room (room 11) locked up: bus error in the handle-flag routines DoSound calls on a purged
+  sound handle, now guarded (ARCHITECTURE.md "Prog patches"). Not a version mismatch: the fault is in
+  Prog, so any build would hit it. Verified headless with the player's save (`tests/restore.txt`).
+  (2) Quit (game-over box or settings panel) crashed on real hardware: the shim left its vectors
+  installed at Pterm; now it restores everything (ARCHITECTURE.md "Interrupts and timing").
+  Verified with `--natfeats no`: desktop reached and stable. **Not yet tried by the user.**
+
 ## Known gaps / risks
 
 0. Start-up from a real hard disk was slow (~94 s black screen in Hatari's ACSI emulation);

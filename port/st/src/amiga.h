@@ -109,6 +109,8 @@ int display_is_shown(const void *p);
 /* input.c */
 void input_init(void);
 void input_restore(void);
+void display_restore(void);
+long ym_silence(void);
 
 /* dos.c */
 void dos_init(void);

@@ -145,6 +145,17 @@ void c_exception(u32 *f) {
 extern u32 pc_samples[256], old_vbl_vector;
 extern char pcsample_entry[];
 static long install_sampler(void) { old_vbl_vector = *(u32 *)0x70; *(u32 *)0x70 = (u32)pcsample_entry; return 0; }
+/* Exit: put the VBL vector back and stop the profiler's Timer A if it ran (MFP TACR, IERA/IMRA
+ * bit 5); both point into this program, which TOS frees at Pterm. */
+extern u16 *prof_hist_ptr;
+static long remove_interrupts(void) {
+    *(u32 *)0x70 = old_vbl_vector;
+    if (prof_hist_ptr) {
+        *(volatile u8 *)0xfffffa19 = 0;
+        *(volatile u8 *)0xfffffa07 &= ~0x20; *(volatile u8 *)0xfffffa13 &= ~0x20;
+    }
+    return 0;
+}
 void pc_report(void) {
     static u32 pcs[256]; static int cnt[256]; int n = 0;
     for (int i = 0; i < 256; i++) {
@@ -215,8 +226,9 @@ int shim_main(void *bp) {
     dbg("KQ5 TOS shim starting; Prog at $%x..$%x\n", (u32)hunk0, (u32)prog_end);
     static const int vecs[] = { 2, 3, 4, 5, 6, 7, 8, 10, 11 };
     void *hs[] = { exc_2, exc_3, exc_4, exc_5, exc_6, exc_7, exc_8, exc_10, exc_11 };
-    for (int i = 0; i < 9; i++) Setexc(vecs[i], hs[i]);
-    Setexc(32 + 5, trap5_handler);
+    long old_vecs[10];
+    for (int i = 0; i < 9; i++) old_vecs[i] = Setexc(vecs[i], hs[i]);
+    old_vecs[9] = Setexc(32 + 5, trap5_handler);
 
     mem_init();
     Supexec(install_sampler);
@@ -239,7 +251,14 @@ int shim_main(void *bp) {
 
     long rc = run_prog(hunk0, prog_stack + sizeof prog_stack, sizeof prog_stack - 8);
     dbg("Prog returned %d\n", rc);
+    /* Back to the desktop: undo everything that points into this program or changed the
+     * machine (on a real ST a leftover vector halted the CPU right after Pterm). */
+    Supexec(remove_interrupts);
+    Supexec(ym_silence);
     input_restore();
+    display_restore();
+    for (int i = 0; i < 9; i++) Setexc(vecs[i], (void *)old_vecs[i]);
+    Setexc(32 + 5, (void *)old_vecs[9]);
     nf_exit(rc);
     return rc;
 }

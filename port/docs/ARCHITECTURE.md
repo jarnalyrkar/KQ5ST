@@ -49,6 +49,9 @@ resume mid-function use the `HOOK` macro in `glue.S`.
   (pri/ctl fill). Still Amiga: ShiftScreen, hunk 52 `+$3e8` (GRAPHICS.md).
 - Joystick poll hunk 16 `+$160` → `c_input_poll` (INPUT.md).
 - `IsObject` (hunk 23 `+$534`): NULL check before reading the magic word.
+- Handle header flags (hunk 59 `+$9ea`, `+$a0c`, called in pairs by DoSound, hunk 31): skipped when
+  `*handle` is NULL (purged). Restoring a save in room 11 (bees, bear) hit `-2(NULL)` → bus error at
+  `H59_a1e`, seen by players as a lock-up (2026-10-21).
 - kSetCursor with a position (hunk 17 `+$aa`): moved the pointer via input.device on the Amiga; hooked.
 - Kernel-call trace hook at hunk 4 `+$9ee` (`KTRACE`, WORKFLOW.md).
 - Speed: next-fit free-handle search (hunk 59 `+$c16`), verified property-lookup cache in send
@@ -95,6 +98,12 @@ of the address space) fault and need individual patches like `IsObject` (a bus e
 
 ## Interrupts and timing
 
+- Exit (2026-10-21): when Prog returns (Quit, incl. the game-over box), `shim_main` puts back the
+  `$70` vector, Timer A (if the profiler ran), the exception vectors and trap #5, silences the YM,
+  restores the IKBD vectors, screen, palette and resolution, then Pterm. Before this a real ST (or
+  Hatari with `--natfeats no`) halted with a double bus error right after Quit; with NatFeats the
+  emulator exits first, which hid it. Code that touches hardware or SR at exit needs `Supexec`
+  (the shim is back in user mode after `run_prog`).
 - The TOS VBL queue stopped calling our entry after a while; the shim runs the SCI tick server
   (Prog's VERTB server, registered through AddIntServer) from its own level-4 vector wrapper
   (`pcsample_entry`), which also samples PCs for the profiler.

@@ -157,6 +157,28 @@ hook_isobject:
 	addq.w	#1,%d0
 1:	jmp	hunk23+0x546
 
+| Handle header flags (hunk 59 +$9ea clears bit 0 of the word at -2(*handle), +$a0c sets/clears
+| bit 7; DoSound calls them in pairs on a sound's handle). A purged handle (*handle = NULL, e.g. a
+| sound restored from a save game) makes the Amiga read and write ROM harmlessly; skip the call.
+	.globl	hook_hpurgeflag, hook_hlockflag
+hook_hpurgeflag:
+	movea.l	4(%sp),%a0
+	movea.l	(%a0),%a0
+	cmpa.w	#0x800,%a0		| NULL / low memory -> nothing to flag
+	bcs.s	1f
+	link	%a5,#-4			| the two instructions the jmp replaced
+	movea.l	8(%a5),%a0
+	jmp	hunk59+0x9f2
+hook_hlockflag:
+	movea.l	4(%sp),%a0
+	movea.l	(%a0),%a0
+	cmpa.w	#0x800,%a0
+	bcs.s	1f
+	link	%a5,#-6
+	movea.l	8(%a5),%a0
+	jmp	hunk59+0xa14
+1:	rts
+
 | Replacement for TOS's ikbdsys (Kbdvbase entry 8): called from the ACIA interrupt handler in
 | supervisor mode with d0-d3/a0-a3/a5 saved, once per pending byte. Reads the keyboard ACIA and
 | hands the byte to ikbd_byte (input.c); anything else (IRQ without data) goes to the TOS routine.

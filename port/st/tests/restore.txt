@@ -1,0 +1,15 @@
+# Restore the first save game listed in KQ5sg.dir, through the settings panel (list only the save
+# to test, e.g. the room-11 bear save from the 2026-10-21 bug report). Expect the room, no bus error.
+1200 key 27
+1500 key 27
+1800 click 183 52
+2600 move 160 3
+2700 click 256 8
+3000 move 102 80
+3050 key 13
+3300 shot
+3400 key 13
+3700 shot
+4200 shot
+5000 shot
+5100 quit

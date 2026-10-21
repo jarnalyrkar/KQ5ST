@@ -1,0 +1,11 @@
+# Quit from the settings panel (Enter on the focused button after moving the pointer onto it).
+# Run with --natfeats no --run-vbls 7000 --avirecord: the last frames must show the desktop.
+1200 key 27
+1500 key 27
+1800 click 183 52
+2600 move 160 3
+2700 click 256 8
+3000 move 102 120
+3050 key 13
+3300 shot
+3400 key 13

@@ -64,7 +64,8 @@ state only; how things work is in the area files.
   (2) Quit (game-over box or settings panel) crashed on real hardware: the shim left its vectors
   installed at Pterm; now it restores everything (ARCHITECTURE.md "Interrupts and timing").
   Verified with `--natfeats no`: desktop reached and stable. Released as v0.1.5 (pre-release,
-  2026-10-21; zip checked from an AHDI image with NatFeats off). **Not yet tried by the user/players.**
+  2026-10-21; zip checked from an AHDI image with NatFeats off). **Confirmed working by the
+  reporting player (zkogur), 2026-10-21.**
 
 ## Known gaps / risks
 

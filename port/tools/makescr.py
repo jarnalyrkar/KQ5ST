@@ -111,6 +111,13 @@ PATCHES = [
     # cycleSpeed, so Graham only stepped every third game cycle. Make the default the slider's
     # top position (100 %): push2 -> push0.
     (0, 0x8e4, b'\x7a', b'\x76'),
+    # 16-colour script branches in every interpreter: KQ5::init stores kGraph(GetColorCount) in
+    # global 105 (global 159 = more than 16), and the dialog/panel colours branch on it
+    # (GRAPHICS.md "Dialog box colours"). Prog already answers 16 on the ST (prog.patch, hunk 55);
+    # ScummVM answers 32 for Amiga KQ5, which with the EGA `spal` (makest.py) gave white boxes
+    # with light blue frames. `push1; push2; callk Graph 2` -> `ldi 16` (word) + `ldi 16` (byte):
+    # acc = 16 for the following `sag 105`, nothing pushed. Only call of GetColorCount in KQ5.
+    (0, 0x845, b'\x78\x7a\x43\x6c\x02', b'\x34\x10\x00\x35\x10'),
     # Keypad with the walk cursor walks Graham (as in the DOS game / the manual). KQ5 Amiga's
     # kQPMouse::handleEvent (script 0, a PseudoMouse) saves the current icon's verb, forces it to 0,
     # calls PseudoMouse::handleEvent (script 933) and restores the verb - so the stock walk-cursor
@@ -139,6 +146,15 @@ PATCHES = [
     # at 8 cycles/s before Graham can move. pushi 3 -> pushi 0 (the idle head-turn in `rotate`
     # keeps its speed 3).
     (202, 0x4f6, b'\x38\xd8\x00\x78\x39\x03\x38\x93\x00', b'\x38\xd8\x00\x78\x39\x00\x38\x93\x00'),
+    # Pause panel titles redrawn wider in font 69 (makest.py TEXT_CELS, view 946): gcWin::open draws
+    # DETAIL and SPEED with DrawCel at a fixed left x (per-language constants + 10), so move them
+    # left by the cels' added padding to keep them centred over their sliders: the final
+    # `ldi 10; add` of each x becomes 10 - pad. (VOLUME keeps its width; GAME PAUSED is centred
+    # by CelWide.)
+    # DETAIL (loop 0 cel 4), pad 2 would give x 71, but the opaque cel then covers the button
+    # column's border line at screen x 133 (user, 2026-11-07): x 72, text 1 pixel right of its slot.
+    (755, 0x9dc, b'\x35\x0a\x02', b'\x35\x09\x02'),
+    (755, 0xad9, b'\x35\x0a\x02', b'\x35\x09\x02'),   # SPEED (loop 0 cel 2), pad 1: x 156 -> 155
 ]
 METHODS = []
 HOOKS = [

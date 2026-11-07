@@ -148,8 +148,15 @@ static long install_sampler(void) { old_vbl_vector = *(u32 *)0x70; *(u32 *)0x70 
 /* Exit: put the VBL vector back and stop the profiler's Timer A if it ran (MFP TACR, IERA/IMRA
  * bit 5); both point into this program, which TOS frees at Pterm. */
 extern u16 *prof_hist_ptr;
+extern u32 old_timerb_vector;
+extern volatile u8 tick_timer;
 static long remove_interrupts(void) {
     *(u32 *)0x70 = old_vbl_vector;
+    if (tick_timer) {                                /* 60 Hz tick on timer B (exec.c start_tick) */
+        *(volatile u8 *)0xfffffa1b = 0;
+        *(volatile u8 *)0xfffffa07 &= ~1; *(volatile u8 *)0xfffffa13 &= ~1; *(volatile u8 *)0xfffffa0f &= ~1;
+        *(u32 *)0x120 = old_timerb_vector; tick_timer = 0;
+    }
     if (prof_hist_ptr) {
         *(volatile u8 *)0xfffffa19 = 0;
         *(volatile u8 *)0xfffffa07 &= ~0x20; *(volatile u8 *)0xfffffa13 &= ~0x20;

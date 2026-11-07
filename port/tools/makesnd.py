@@ -8,6 +8,9 @@ SOUNDS: sound number -> dict with
   'drop':  [device track types] - remove these tracks from the header entirely, so the sound has
            no track for the YM driver and stays silent on the ST (like the sounds that never had a
            $13 track); the other devices' tracks are untouched.
+  'from_dos': [device track types] - copy these tracks from the DOS version of the sound (their
+           channel data appended to the resource). For the MT-32 driver: sounds 16 and 811 have
+           no MT-32 ($0C) track in the Amiga data, but the DOS data has one (2026-11-07).
   'edits': [(track type, channel, edit, argument), ...] - changes to one channel's event data.
            The edited channel is copied to the end of the resource and the track's header entry
            points at the copy, so other tracks that share the original data are untouched.
@@ -43,7 +46,20 @@ SOUNDS = {
     # square-wave $13 (PCjr) track it is a fast high chatter; the user wanted it gone
     # (2026-10-17), so the $13 track is dropped. Sound 2 (the desert wind) never had a $13 track.
     3: {'drop': [0x13]},
+    # No MT-32 track in the Amiga data (the Amiga driver plays track 6); take the DOS one so the
+    # MT-32 driver (st/src/mt32.c) plays them. 16 = bee hive (room 11) music, 811 = short cue.
+    16: {'from_dos': [0x0c]},
+    811: {'from_dos': [0x0c]},
+    # No $13 (PCjr/Tandy) track in the Amiga data, so silent on the YM; the DOS data has one
+    # (2026-11-07). 50 = labyrinth music (room 55), 51 = room 2, 785 = desert/spider region,
+    # 787 = room 86. The other 33 sounds without a $13 track have none in DOS either.
+    50: {'from_dos': [0x13]},
+    51: {'from_dos': [0x13]},
+    785: {'from_dos': [0x13]},
+    787: {'from_dos': [0x13]},
 }
+
+SRC_DOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'extracted', 'res_dos', 'sound')
 
 def parse_tracks(d):
     """-> (tracks, header end): tracks = [(type, [6-byte channel entries])]"""
@@ -117,6 +133,21 @@ def rebuild(d, spec):
     tracks, hdr_end = parse_tracks(d)
     assert all(t in dict(tracks) for t in spec.get('drop', [])), 'track to drop not in sound'
     extra, moved = apply_edits(d, tracks, edits)
+    added = []                                        # (type, [entries with offsets in d's space])
+    if spec.get('from_dos'):
+        dd = open(os.path.join(SRC_DOS, str(spec['n'])), 'rb').read()
+        dtracks, _ = parse_tracks(dd)
+        extra = bytearray(extra); copied = {}
+        for t in spec['from_dos']:
+            assert t in dict(dtracks) and t not in dict(tracks), 'track $%02x: not in DOS or already in Amiga' % t
+            ents = []
+            for c in dict(dtracks)[t]:
+                off, sz = entry_off_size(c)
+                if off not in copied:
+                    copied[off] = len(d) + len(extra); extra += dd[off:off + sz]
+                ents.append(c[:2] + struct.pack('<HH', copied[off], sz))
+            added.append((t, ents))
+        extra = bytes(extra)
     out_tracks = []
     for t, chans in tracks:
         if t in spec.get('drop', []): continue
@@ -127,6 +158,7 @@ def rebuild(d, spec):
             missing = set(want) - found
             assert not missing, 'channels %s not in track $%02x' % (sorted(missing), t)
         out_tracks.append((t, chans))
+    out_tracks += added
     new_hdr = sum(1 + 6 * len(c) + 1 for _, c in out_tracks) + 1
     shift = new_hdr - hdr_end
     h = bytearray()
@@ -134,7 +166,7 @@ def rebuild(d, spec):
         h.append(t)
         for c in chans:
             off, sz = entry_off_size(c)
-            if (t, entry_channel(d, c)) in moved: off, sz = moved[(t, entry_channel(d, c))]
+            if off < len(d) and (t, entry_channel(d, c)) in moved: off, sz = moved[(t, entry_channel(d, c))]
             h += c[:2] + struct.pack('<HH', off + shift, sz)
         h.append(0xff)
     h.append(0xff)
@@ -146,7 +178,7 @@ def main():
     src = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'extracted', 'res_amiga', 'sound')
     for n, spec in SOUNDS.items():
         d = open(os.path.join(src, str(n)), 'rb').read()
-        out = rebuild(d, spec)
+        out = rebuild(d, dict(spec, n=n))
         path = os.path.join(outdir, '%d.snd' % n)
         open(path, 'wb').write(b'\x84\x00' + out)      # SCI patch header: resource type $84 = sound
         print('wrote', path, len(out), 'bytes (was %d)' % len(d))

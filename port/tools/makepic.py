@@ -7,8 +7,24 @@ import scipic
 from sciview import encode_amiga_rle
 R = os.path.join(os.path.dirname(__file__), '..', 'extracted')
 
+def vector_hybrid(amiga_data, a, ega_data):
+    """Amiga picture without an embedded cel (only pic 55, the black labyrinth backdrop): put the
+    EGA visual in as a cel after the leading palette block and turn the visual off for every later
+    op. On the ST, Prog's pixel plots and blits skip bitplane 4, so the cleared screen reads back
+    as colour 15 instead of the clear colour 31 and visual flood fills never start; the screen
+    stayed white (player report 2026-11-07, GRAPHICS.md "Picture 55")."""
+    e = scipic.render(ega_data, True)
+    first = a.op_starts[1] if amiga_data[0] == 0xFE and amiga_data[1] == 0x02 else 0
+    cel = struct.pack('<HHbBBB', scipic.W, scipic.H, 0, 0, 255, 0) + encode_amiga_rle(bytes(e.vis), 255, scipic.W)
+    out = bytearray(amiga_data[:first]) + b'\xfe\x01\x00\x00\x00' + struct.pack('<H', len(cel)) + cel
+    starts = [p for p in a.op_starts if p >= first] + [len(amiga_data)]
+    for p, q in zip(starts, starts[1:]):
+        out += b'\xf1' if amiga_data[p] == 0xF0 else amiga_data[p:q]
+    return bytes(out), a, e
+
 def hybrid(amiga_data, ega_data):
     a = scipic.render(amiga_data, False)
+    if not a.cel_blocks: return vector_hybrid(amiga_data, a, ega_data)
     if len(a.cel_blocks) != 1: raise ValueError(f'{len(a.cel_blocks)} embedded cels')
     op_at, hdr, size = a.cel_blocks[0]
     w, h = struct.unpack('<HH', amiga_data[hdr:hdr+4])

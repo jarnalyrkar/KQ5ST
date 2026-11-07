@@ -56,6 +56,50 @@ the "played before?" box in the shot after the second).
 The commands are executed by the shim's input code (`c_input_poll`, hooked into Prog's GetEvent,
 see INPUT.md), so they only work while the game polls for events.
 
+### Jumping to any room (debug teleport, 2026-11-07)
+
+Script 0 turns on the game's debug keys (global 100) when the version string starts with `x`
+(script 0 `+$0926`: `callk StrAt; push; ldi 120; eq?`). For a test, copy `st/hd` to a scratch
+folder (without the save games), and in its `0.SCR` change the `78` of the byte sequence
+`36 35 78 1a 30 07 00` to `31` (`ldi '1'`, matching "1.000.000"). Never ship this. Then Alt-T
+(`key 5120`) opens "Teleport to:" (type digits with `key 48`-`57`, then `key 13`). After "played
+before? Yes" (`click 183 52`, VBL 1800) the prompt works from about VBL 2700. A restart in debug
+mode asks for a room again. Teleporting into a room that needs story state can stop the game with
+"Oops! You have tried something we didn't think of" (room 3, the town, 2026-11-07); the sound
+system shuts down too, so check a screenshot before trusting a teleported sound capture. For such
+rooms restore a save instead: copy `st/hd` with the user's saves and write a `KQ5sg.dir` that
+lists only the wanted save (format: 2-byte big-endian save number, name, `\n`, ..., `FF FF`), then
+run `tests/restore.txt`. With `MT32` present the start-up is ~6 s longer (SysEx upload): add ~700
+VBLs to the script times. Used for rooms 40 and 55 (player report 2026-11-07). The new room
+starts from its default state (no inventory, flags unset).
+Click coordinates are screen coordinates (picture y + 10). `key 20480` (down arrow) did not walk
+Graham in a headless run; clicks do. Hatari takes screenshots on its own every ~250 VBLs as well
+as on `shot`.
+
+### MT-32 in Hatari (2026-11-07)
+
+`st/play.sh --mt32 DEVICE [hatari args]` creates `hd/MT32` for the run (removed afterwards unless
+it already existed) and adds `--midi-in /dev/null --midi-out DEVICE`. Without `--midi-in`
+Hatari fails to open its default MIDI input and disables MIDI altogether. DEVICE is a raw MIDI
+device: `amidi -l` lists them (`hw:2,0` = `/dev/snd/midiC2D0`), e.g. a USB MIDI interface to a
+real MT-32. For Munt (an ALSA sequencer client, no raw device): `sudo modprobe snd-virmidi`, then
+`amidi -l` shows the new `VirMIDI` devices; `aconnect -l` shows their sequencer ports and Munt's;
+connect them with `aconnect <virmidi client:port> <munt client:port>` and pass the matching
+`/dev/snd/midiCxD0`. A plain file as DEVICE captures the bytes for `tools/midicheck.py`. With
+`hd/MT32` present a normal `play.sh` run is silent (the YM is off); play.sh prints a note.
+
+Munt without root (2026-11-07): `tools/mt32bridge/` builds Munt's `libmt32emu` sources straight
+with g++ (no cmake/Qt/ALSA headers; `config.h` is generated from `config.h.in` by `build.sh`)
+into `mt32bridge ROMDIR FIFO`, which feeds the bytes Hatari writes into a named pipe to the
+emulated MT-32 and writes 32 kHz s16 stereo to stdout. `play.sh --munt ROMDIR` makes
+`st/munt.fifo`, runs `mt32bridge | pw-cat --playback` and Hatari with `--midi-out` on the FIFO
+(bridge messages in `st/munt.log`, including the MT-32 display texts). Steps:
+`git clone --depth 1 https://github.com/munt/munt.git ~/.local/src/munt`, then
+`tools/mt32bridge/build.sh`. ROMs: the user has MT-32 ROMs in the 86Box ROM pack and in ScummVM
+game folders (e.g. `~/.local/share/scummvm/games/Beneath a Steel Sky`). **Not yet run**: the
+build/run of the downloaded Munt code was blocked by the session's permission check; open
+question whether Hatari flushes `--midi-out` per byte (if it buffers, the music lags).
+
 ## Reading the log
 
 - The log goes through Hatari NatFeats (`--natfeats yes`; the user's config has `bNatFeats = TRUE`).
@@ -111,8 +155,43 @@ between builds to check the cache answers as GEMDOS did.
   profiler (`profreset`/`prof` in a test script; summarise with `tools/profsum.py st/run.log
   st/hd/KQ5ST.sym work/prog/disasm`) or Hatari's cycle profiler:
   `run.sh N script --parse dbg/prof.ini` (`profile on` / `profile cycles 600`) and
-  `tools/profsum.py st/run.log st/hd/KQ5ST.sym work/prog/disasm --hatari`.
+  `tools/profsum.py st/run.log st/hd/KQ5ST.sym work/prog/disasm --hatari`; per instruction:
+  `tools/hprofmap.py LOG KQ5ST.sym [H23_]` (2026-11-07; the `profile cycles 1500` list).
+  The cycle profiler slows Hatari a lot: 250 profiled VBLs need ~30-60 min, so run Hatari with a
+  long `timeout` (run.sh's 900 s is not enough) and keep the profiling window short. Breakpoint
+  VBLs are Hatari's count, ~1100 more than the shim's autoplay times.
+- Three-scene benchmark `tools/bench3.py TAG PRG` (BENCH_DIR with a game-folder copy `hdm` and
+  `st/tests/bench_save.txt`): room 1 walk plus two restored saves; compare sums, ignore <3 %.
 - `tools/hunkmap.py` gives a per-hunk profile table (run from `port/`).
+
+## Equivalence tests (2026-11-07)
+
+Prog routines replaced by faster code in `glue.S` are checked against the originals in a
+68000 emulator: `tools/equiv/run.sh [cases]` assembles the replacement blocks from `glue.S`,
+loads Prog's hunks (`work/prog/hunkNN.bin`) into Python `unicorn` (user site-packages, so it
+runs without `-I`) and compares results, memory writes, stack and the registers the original
+may change. `geotest.py`: the five hunk 36 geometry helpers (20000 cases each incl. edge values
+and aliased output). `celtest.py`: the whole cel row routine (hunk 56 `+$4e0`) with random RLE
+sprites, priority maps and thresholds. Set the CPU model to `UC_CPU_M68K_M68000`: unicorn's
+default is a ColdFire, which lacks `movem` with predecrement among others. A deliberately wrong
+replacement must fail (checked: 31 of 40 cel cases). The method-lookup cache experiment (since
+reverted, GRAPHICS.md "Performance") used the same approach with whole-routine register
+comparison and an offline table-fingerprint proof over all scripts.
+
+`pmtest.py` (2026-11-07) checks the rewritten bytecode interpreter and send (`st/src/pmachine.S`,
+ARCHITECTURE.md "Bytecode interpreter") against Prog's hunk 4 loop running with Prog's real hunk 23:
+`tools/equiv/pmbuild.sh DIR` assembles `pmachine.S` with stand-ins (`pmtstub.S`) and
+`python3 tools/equiv/pmtest.py BIN ENTRY [worlds] [seed] [world-to-trace]` generates random
+worlds (1-3 scripts with procedures, classes with method dictionaries and superclass chains,
+instances, globals, locals; bytecode with every opcode, calls, kernel calls, sends/self/super/
+class, `&rest`, forward branches, invalid exports/classes/selectors/opcodes for the error paths)
+and runs each on both interpreters in unicorn. Kernel functions, the script loader and PError
+are Python stand-ins on `rts` stubs that clobber every register they may, return pseudo-random
+results in acc and move every script's code now and then; the loader keeps a2 as Prog relies
+on. Compared: all variables, stack, objects, code, interpreter globals (except the debug send
+stack, `-$7132`, `-$4f3e`, which `pmachine.S` does not keep), the kernel-call log, the error
+and a0/a2 at the final `ret`. `run.sh` runs 150 worlds; 300 per seed take ~10 min. Tracing a
+world prints the opcode sequence of both with acc, a2 and d2 and the first divergence.
 
 ## Headless-run problems (2026-10-17)
 
@@ -150,7 +229,10 @@ between builds to check the cache answers as GEMDOS did.
   changes. A windowed run with sound on (`play.sh`, or `--window --sound 44100 --run-vbls N`)
   progresses normally. Not investigated further.
 - Hatari's `--cmd-fifo` key injection for a headless key-level test was not completed; the
-  `ikbd` autoplay command covers the shim's decoder instead.
+  `ikbd` autoplay command covers the shim's decoder instead. Screenshots through it work
+  (2026-11-07): start Hatari with `--cmd-fifo F --screenshot-dir D`, then
+  `echo "hatari-shortcut screenshot" > F` - useful after Quit, when the shim's `shot` no longer
+  runs. `--avirecord` in a headless fast-forward run gave a few hundred white frames.
 - Sound capture that worked (2026-10-17 00:11): `st/run.sh 5200 tests/intro_sound.txt --sound
   44100 --avirecord --avi-file snd.avi`, then `ffmpeg -i st/hd/snd.avi -vn snd.wav` and `sox
   snd.wav -n spectrogram`. Captures need `--fast-forward yes` (the default): with `--fast-forward

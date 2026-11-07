@@ -9,7 +9,7 @@ OUT=dist/KQ5ST-$VER
 rm -rf "$OUT" "$OUT.zip"; mkdir -p "$OUT/KQ5ST"
 for f in st/hd/*; do
     case "$(basename "$f")" in
-        KQ5sg.*|SHOT*|AUTO.TXT|HELLO.PRG|KQ5ST.sym|NOSND|NOBLIT|KTRACE|YM_TRACE|*.avi|*.log) ;;
+        KQ5sg.*|SHOT*|AUTO.TXT|HELLO.PRG|KQ5ST.sym|NOSND|NOBLIT|KTRACE|YM_TRACE|MT32|*.avi|*.log) ;;
         *) cp "$f" "$OUT/KQ5ST/" ;;
     esac
 done

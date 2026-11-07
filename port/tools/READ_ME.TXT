@@ -39,11 +39,22 @@ Real hardware (untested): copy the KQ5ST folder to your hard disk (ACSI, SD
   adapter such as UltraSatan / ACSI2STM, or similar) and run KQ5ST.PRG.
 
 
+ROLAND MT-32 MUSIC
+------------------
+Create an empty file named MT32 in the same folder as KQ5ST.PRG to play
+the music on a Roland MT-32 (or CM-32L / CM-64, or the Munt emulator)
+connected to the ST's MIDI OUT, instead of the YM chip. The YM chip is then
+silent. Delete the file to go back.
+At start-up the game sends Sierra's instrument set to the module (about
+6-8 seconds; the MT-32 display shows "KINGS QUEST V"). General MIDI and
+other synths (D-50, etc.) are not supported: the music is written for the
+MT-32's own sounds and drum kit.
+
+
 CONTROLS
 --------
 Mouse as on the Amiga/PC: left button acts with the current cursor, right
 button cycles the cursors, move to the top of the screen for the icon bar.
-- Double-click: Graham walks there at once (at a screen edge: next room).
 - Esc, or both mouse buttons: skip the Sierra logo / title; in the game
   Esc opens the icon bar.
 - Keypad as in the PC manual: digits move the pointer (or walk Graham with
@@ -56,7 +67,7 @@ KNOWN PROBLEMS
 --------------
 - Play-tested from the opening through the town, the forest and the
   desert (oasis, temple, bandits' tent). Later rooms may crash.
-- Music runs at 50 Hz (about 17% slow); no percussion; some sounds silent.
+- YM music has no percussion; some sounds are silent.
 - Rooms that scroll sideways would crash (not met yet).
 - Copy protection is removed, as in the later CD release.
 Please report problems on the project page.

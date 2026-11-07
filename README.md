@@ -46,7 +46,7 @@ included (see `.gitignore`).
 | Path | Contents |
 |---|---|
 | [`port/docs/`](port/docs/README.md) | Development notes, split by area. **Start with [`port/docs/README.md`](port/docs/README.md).** They cover how the interpreter is mapped onto TOS (`ARCHITECTURE.md`), art and screen (`GRAPHICS.md`), input (`INPUT.md`), game-script patches (`SCRIPTS.md`), the YM2149 sound driver (`SOUND.md`), a map of the Amiga interpreter (`AMIGA_PROG.md`) and how to build, test and debug (`WORKFLOW.md`). |
-| [`port/st/src/`](port/st/src) | The TOS shim in C and 68000 assembly: AmigaOS libraries (`exec.c`, `dos.c`, `memory.c`), display and blitter (`display.c`, `blit.c`, `blitter.c`), IKBD input (`input.c`), YM2149 sound (`ym.c`), startup and trap glue (`glue.S`). |
+| [`port/st/src/`](port/st/src) | The TOS shim in C and 68000 assembly: AmigaOS libraries (`exec.c`, `dos.c`, `memory.c`), display and blitter (`display.c`, `blit.c`, `blitter.c`), IKBD input (`input.c`), YM2149 sound (`ym.c`), Roland MT-32 over MIDI (`mt32.c`), startup and trap glue (`glue.S`). |
 | [`port/st/patches/prog.patch`](port/st/patches/prog.patch) | Byte patches applied to the Amiga interpreter during the build, with comments. |
 | `port/st/build.sh`, `play.sh`, `run.sh` | Build `KQ5ST.PRG`; play in Hatari; headless test runs. |
 | [`port/st/tests/`](port/st/tests) | Autoplay scripts for headless Hatari runs. |

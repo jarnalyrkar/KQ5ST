@@ -126,24 +126,132 @@ hook_\name:
 	HOOK	pcfill, hunk55+0x184
 	HOOK	setcursor, hunk17+0x180
 
-| Kernel call trace (hunk 4 +$9ee): d1 = kernel number * 4, a2 = args (argc.w, args...). Runs the
-| function itself between the two C calls, then resumes after Prog's own jsr.
-	.globl	hook_ktrace
-hook_ktrace:
-	lea	-0x7816(%a4),%a6
-	movea.l	(%a6,%d1.w),%a6
-	movem.l	%d0-%d7/%a0-%a6,-(%sp)
-	move.l	%sp,-(%sp)
-	jsr	c_ktrace_pre
-	addq.l	#4,%sp
-	movem.l	(%sp)+,%d0-%d7/%a0-%a6
-	jsr	(%a6)
-	movem.l	%d0-%d7/%a0-%a6,-(%sp)
-	move.l	%sp,-(%sp)
-	jsr	c_ktrace_post
-	addq.l	#4,%sp
-	movem.l	(%sp)+,%d0-%d7/%a0-%a6
-	jmp	hunk4+0x9f8
+| Polygon geometry helpers of hunk 36 (path-finding, polygon tests), replaced whole: same results,
+| no stack frame, only registers the originals clobber (performance, 2026-11-07). Args are longs
+| (pointers to x,y word pairs) at 4/8/12(sp).
+	.globl	hook_ptsub, hook_ptadd, hook_ptdot, hook_ptcross, hook_ptdist2
+hook_ptsub:				| +$2cf2: *c = *a - *b   (orig clobbers d0/a0/a1/a6)
+	movea.l	4(%sp),%a1
+	movea.l	8(%sp),%a6
+	movea.l	12(%sp),%a0
+	move.w	(%a1),%d0
+	sub.w	(%a6),%d0
+	move.w	%d0,(%a0)
+	move.w	2(%a1),%d0
+	sub.w	2(%a6),%d0
+	move.w	%d0,2(%a0)
+	rts
+hook_ptadd:				| +$2d24: *c = *a + *b
+	movea.l	4(%sp),%a1
+	movea.l	8(%sp),%a6
+	movea.l	12(%sp),%a0
+	move.w	(%a1),%d0
+	add.w	(%a6),%d0
+	move.w	%d0,(%a0)
+	move.w	2(%a1),%d0
+	add.w	2(%a6),%d0
+	move.w	%d0,2(%a0)
+	rts
+hook_ptdot:				| +$2d56: a.x*b.x + a.y*b.y   (orig clobbers d0/d1/a0/a1)
+	movea.l	4(%sp),%a0
+	movea.l	8(%sp),%a1
+	move.w	(%a0),%d0
+	muls.w	(%a1),%d0
+	move.w	2(%a0),%d1
+	muls.w	2(%a1),%d1
+	add.l	%d1,%d0
+	rts
+hook_ptcross:				| +$2d7c: sign of a.x*b.y - a.y*b.x  (-1, 0, 1)
+	movea.l	4(%sp),%a0
+	movea.l	8(%sp),%a1
+	move.w	(%a0),%d0
+	muls.w	2(%a1),%d0
+	move.w	2(%a0),%d1
+	muls.w	(%a1),%d1
+	sub.l	%d1,%d0
+	beq.s	1f
+	blt.s	2f
+	moveq	#1,%d0
+1:	rts
+2:	moveq	#-1,%d0
+	rts
+hook_ptdist2:				| +$2dbc: dx*dx + dy*dy, 32-bit (orig: d0-d2/a0 + mulsi3)
+	movea.l	4(%sp),%a0		| |dx| <= 65535, so mulu.w gives the same low 32 bits
+	move.w	(%a0),%d0
+	ext.l	%d0
+	move.w	2(%a0),%d1
+	ext.l	%d1
+	movea.l	8(%sp),%a0
+	move.w	(%a0),%d2
+	ext.l	%d2
+	sub.l	%d2,%d0
+	bpl.s	1f
+	neg.l	%d0
+1:	mulu.w	%d0,%d0
+	move.w	2(%a0),%d2
+	ext.l	%d2
+	sub.l	%d2,%d1
+	bpl.s	2f
+	neg.l	%d1
+2:	mulu.w	%d1,%d1
+	add.l	%d1,%d0
+	rts
+
+| Cel drawing, opaque run (hunk 56 +$578, d0 = colour 0-31, d2 = run length 1-7): the original
+| calls one of 32 per-colour plot routines per pixel (jsr/rts, table lookup). Here one loop per
+| colour with the plane writes inline; colours 16-31 differ only in plane 4, which the ST does not
+| show (prog.patch skips it there too). Priority test and pri/ctl update as the original
+| (performance, 2026-11-07). Resumes at +$5a2 (row loop test).
+	.globl	hook_celrun
+hook_celrun:
+	and.w	#15,%d0
+	add.w	%d0,%d0
+	move.w	celrun_tab(%pc,%d0.w),%d0
+	jmp	celrun_tab(%pc,%d0.w)
+celrun_tab:
+	.irp	c,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+	.word	celrun_\c-celrun_tab
+	.endr
+	.macro	CELRUN c
+celrun_\c:
+1:	move.b	(%a1),%d1
+	cmp.w	%d1,%d6
+	bcs.s	2f
+	and.b	%d7,(%a1)
+	or.b	%d3,(%a1)
+	.if	(\c & 1)
+	bset	%d5,(%a3)
+	.else
+	bclr	%d5,(%a3)
+	.endif
+	.if	(\c & 2)
+	bset	%d5,0x1f40(%a3)
+	.else
+	bclr	%d5,0x1f40(%a3)
+	.endif
+	.if	(\c & 4)
+	bset	%d5,0x3e80(%a3)
+	.else
+	bclr	%d5,0x3e80(%a3)
+	.endif
+	.if	(\c & 8)
+	bset	%d5,0x5dc0(%a3)
+	.else
+	bclr	%d5,0x5dc0(%a3)
+	.endif
+2:	addq.w	#1,%a1
+	subq.w	#1,%d5
+	bpl.s	3f
+	move.w	#7,%d5
+	addq.w	#1,%a3
+3:	subq.w	#1,%d4
+	subq.w	#1,%d2
+	bne.s	1b
+	jmp	hunk56+0x5a2
+	.endm
+	.irp	c,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+	CELRUN	\c
+	.endr
 
 | IsObject (hunk 23 +$534): Amiga reads -10(NULL) from ROM harmlessly; reject low pointers first.
 	.globl	hook_isobject
@@ -287,51 +395,59 @@ hook_findslot:
 	movem.l	(%sp)+,%a1-%a3
 	rts
 
-| Property lookup in SCI send (hunk 23 +$22c): a1 = selector list, d4 = selector, a3 = values.
-| A 256-entry cache maps (list, selector) to the index; a hit is used only after checking that the
-| list holds the selector at that index (selectors are unique in a list, so it is then correct).
-| Continues at +$23c (found; d2 = count-1-index, d3 = count) or +$25e (not found), as the original.
+| tabfind (the fingerprinted selector-table cache the lookup below uses) lives in pmachine.S.
+
+| Property lookup in send (hunk 23 +$22c): a1 = property selector list, -2(a3) = count, d4 =
+| selector. Leaves d2/d3/a1 as the original scan does: found -> +$23c with d2 = count-1-index,
+| d3 = count, a1 = entry + 2; absent -> +$25e (method chain) with d2 = -1, d3 = count,
+| a1 = list end. Count 0 never occurs; it falls back to the original code (+$232) anyway.
 	.globl	hook_proplookup
 hook_proplookup:
 	move.w	-2(%a3),%d2
-	move.w	%d2,%d3				| d3 = count
-	move.l	%a6,-(%sp)
+	move.w	%d2,%d3
+	beq.s	3f
+	movem.l	%d0/%a6,-(%sp)			| index hint (propcache): exact, cheap for found properties
 	move.l	%a1,%d0
 	eor.w	%d4,%d0
-	and.w	#0x1fe,%d0			| cache slot offset
+	and.w	#0x1fe,%d0
 	lea	propcache,%a6
-	move.w	(%a6,%d0.w),%d2			| cached index * 2
-	cmp.w	%d3,%d2
-	bcc.s	1f				| (index*2 >= count*2 is caught below too)
+	adda.w	%d0,%a6
+	move.w	(%a6),%d3			| cached index * 2
+	lsr.w	#1,%d3
+	cmp.w	%d2,%d3
+	bcc.s	4f
+	add.w	%d3,%d3
+	cmp.w	(%a1,%d3.w),%d4
+	bne.s	4f
+	lsr.w	#1,%d3				| hint hit: d3 = index
+	movem.l	(%sp)+,%d0/%a6
+	bra.s	5f
+4:	bsr	tabfind				| d3 = index or -1
+	tst.w	%d3
+	bmi.s	6f
+	move.w	%d3,(%a6)			| remember index * 2
+	add.w	%d3,(%a6)
+6:	movem.l	(%sp)+,%d0/%a6
+5:
+	move.w	%d3,-(%sp)			| d2.w = index or -1, d3.w = count
+	move.w	%d2,%d3
+	move.w	(%sp)+,%d2
+	tst.w	%d2
+	bmi.s	2f
+	add.w	%d2,%d2				| a1 += 2 * (index + 1)
+	lea	2(%a1,%d2.w),%a1
 	lsr.w	#1,%d2
-	cmp.w	%d3,%d2
-	bcc.s	1f
-	add.w	%d2,%d2
-	cmp.w	(%a1,%d2.w),%d4
-	bne.s	1f
-	lsr.w	#1,%d2				| hit: d2 = count - 1 - index
-	neg.w	%d2
+	neg.w	%d2				| d2 = count - 1 - index
 	add.w	%d3,%d2
 	subq.w	#1,%d2
-	move.l	(%sp)+,%a6
 	jmp	hunk23+0x23c
-1:	move.w	%d3,%d2				| miss: the original linear search
-	subq.w	#1,%d2
-	move.l	%d1,-(%sp)
-2:	cmp.w	(%a1)+,%d4
-	dbeq	%d2,2b
-	bne.s	3f
-	move.w	%d3,%d1				| found: remember index * 2
-	sub.w	%d2,%d1
-	subq.w	#1,%d1
-	add.w	%d1,%d1
-	move.w	%d1,(%a6,%d0.w)
-	move.l	(%sp)+,%d1
-	move.l	(%sp)+,%a6
-	jmp	hunk23+0x23c
-3:	move.l	(%sp)+,%d1
-	move.l	(%sp)+,%a6
+2:	move.w	%d3,%d2				| absent: a1 += 2 * count, d2 = -1
+	add.w	%d2,%d2
+	adda.w	%d2,%a1
+	move.w	#-1,%d2
 	jmp	hunk23+0x25e
+3:	jmp	hunk23+0x232
+
 
 | Unimplemented vector: each library slot is "jsr unimpl_vector" (6 bytes).
 	.globl	unimpl_vector
@@ -375,9 +491,16 @@ vbl_dispatch:
 	jsr	input_vbl
 	jsr	display_vbl
 	movem.l	(%sp)+,%d0-%d1/%a0-%a1
+	tst.b	tick_timer		| servers run on the 60 Hz timer once it is started
+	bne.s	2f
 	tst.w	int_disable
 	bne.s	2f
 	movem.l	%d0-%d7/%a0-%a6,-(%sp)
+	bsr.s	run_servers
+	movem.l	(%sp)+,%d0-%d7/%a0-%a6
+2:	rts
+
+run_servers:
 	lea	vbl_servers,%a2
 1:	move.l	(%a2)+,%d0
 	beq.s	3f
@@ -389,8 +512,26 @@ vbl_dispatch:
 	jsr	(%a5)
 	move.l	(%sp)+,%a2
 	bra.s	1b
-3:	movem.l	(%sp)+,%d0-%d7/%a0-%a6
-2:	rts
+3:	rts
+
+| SCI tick on MFP Timer B, 2457600 / 200 / 205 = 59.94 Hz (the interpreter counts 60 ticks per
+| second; on the 50 Hz PAL VBL music and timers ran 17% slow). Acknowledge at once and drop to
+| IPL 5 so the IKBD and MIDI ACIAs are served while the servers run; a tick that arrives while
+| the previous one still runs is dropped (tick_busy, set before the IPL is lowered).
+	.globl	tick_dispatch, tick_timer
+tick_dispatch:
+	bclr	#0,0xfffffa0f.w		| end of interrupt (ISRA bit 0 = timer B)
+	tst.b	tick_busy
+	bne.s	9f
+	st	tick_busy
+	move.w	#0x2500,%sr
+	tst.w	int_disable
+	bne.s	8f
+	movem.l	%d0-%d7/%a0-%a6,-(%sp)
+	bsr.s	run_servers
+	movem.l	(%sp)+,%d0-%d7/%a0-%a6
+8:	sf	tick_busy
+9:	rte
 
 | Silent SCI sound driver with the interface of amiga3v.drv (entry = seglist + 4, d7 = function).
 | LoadSeg("*.drv") returns this segment until the YM2149 driver exists.
@@ -538,9 +679,10 @@ empty_args:	.asciz	"\n"
 
 	.bss
 vbl_servers:	.space	4*8		| NULL-terminated list of struct Interrupt *
+tick_timer:	.space	1		| 1 = Timer B runs the servers (exec.c start_tick)
+tick_busy:	.space	1
 vbl_count:	.space	4
 slot_hint:	.space	4
-propcache:	.space	512
 prof_hist_ptr:	.space	4
 prof_base:	.space	4
 prof_limit:	.space	4

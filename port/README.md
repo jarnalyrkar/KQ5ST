@@ -21,6 +21,12 @@
   - `viewpreview.py` / `viewpreview2.py OUT.png VIEW...` — comparison sheets
   - `scipic.py` — EGA/Amiga picture renderer (library)
   - `picalign.py [--sheet OUT.png PIC...]` — compare priority/control maps of all pictures, or render sheets
+  - `piccomp.py OUT.png PIC VIEW:LOOP:CEL:X:Y...` — EGA picture with EGA vs current ST cels at prop positions (overlay check)
+  - `midicheck.py CAPTURE` — check a raw MIDI capture (`hatari --midi-out`) from the MT-32 driver
+  - `mt32bridge/` — `build.sh` builds `mt32bridge` (Munt MT-32 emulation fed from a FIFO) for `st/play.sh --munt ROMDIR`
+  - `equiv/run.sh` — prove glue.S / pmachine.S replacements of Prog routines equal to the originals (68000 emulation)
+  - `equiv/pmtest.py`, `equiv/pmbuild.sh` — fuzz the rewritten bytecode interpreter and send against Prog's
+  - `hprofmap.py LOG SYM [PREFIX]` — per-instruction cycle shares from Hatari's profiler; `bench3.py TAG PRG` — three-scene speed benchmark
   - `makepic.py OUTDIR` — build and verify hybrid pictures (Amiga priority/control + EGA visual)
   - `scidisasm.py RESDIR SCRIPT [method]` — SCI script disassembler (objects, properties, bytecode)
   - `makescr.py OUTDIR` — patched game scripts as `N.SCR` patch files (tables of patches/methods/hooks inside, see `docs/SCRIPTS.md`)

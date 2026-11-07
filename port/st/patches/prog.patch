@@ -27,9 +27,19 @@
 # Speed: the 32 per-colour pixel routines (table at data +$1d70) start by writing plane 4, which the
 # ST never shows; enter each routine 4 bytes later.
 1   1d70  -   RELADD:4:32
-# Debug: kernel call trace (KTRACE file in the game folder enables the output)
-4   9ee   4dec87ea2c76   JMP:hook_ktrace
+# Speed: the bytecode interpreter loop (vector 3; hunk 23's send runs methods through it) ->
+# st/src/pmachine.S, a rewrite keeping acc and the base pointers in registers. It includes the
+# KTRACE kernel-call trace that was hooked at +$9ee before.
+4   402   4dfafbfc4241   JMP:pm_entry
 # Speed: SCI's free handle slot search (linear from the start) -> next-fit
 59  c16   4e55000048e7   JMP:hook_findslot
 # Speed: property lookup in send -> verified lookup cache (resumes at +$23c / +$25e)
 23  22c   342bfffe3602   JMP:hook_proplookup
+# Speed: hunk 36 polygon geometry helpers (point sub/add, dot, cross sign, squared distance) -> glue.S
+36  2cf2  4e550000206d   JMP:hook_ptsub
+36  2d24  4e550000206d   JMP:hook_ptadd
+36  2d56  4e550000206d   JMP:hook_ptdot
+36  2d7c  4e55fffc206d   JMP:hook_ptcross
+36  2dbc  4e55fff8206d   JMP:hook_ptdist2
+# Speed: cel drawing opaque runs -> one inline loop per colour (no per-pixel jsr), glue.S
+56  578   d040d0404dec   JMP:hook_celrun

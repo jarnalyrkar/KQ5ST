@@ -89,7 +89,7 @@ Moved to GRAPHICS.md "Screen formats" (visual screen 5 separate planes, chunky p
 |---|---|---|---|---|---|---|
 | 0 | 604 | 3 |  |  |  |  |
 | 3 | 772 | 0 |  |  |  |  |
-| 4 | 8512 | 1 |  |  |  |  |
+| 4 | 8512 | 1 | bytecode interpreter loop `+$402` (replaced by `st/src/pmachine.S`, ARCHITECTURE.md) |  |  |  |
 | 5 | 872 | 1 |  |  |  |  |
 | 6 | 3420 | 6 |  |  |  |  |
 | 7 | 1960 | 5 |  |  |  |  |
@@ -108,7 +108,7 @@ Moved to GRAPHICS.md "Screen formats" (visual screen 5 separate planes, chunky p
 | 20 | 1356 | 0 |  |  |  |  |
 | 21 | 4116 | 1 |  |  |  |  |
 | 22 | 56 | 0 |  |  |  |  |
-| 23 | 3544 | 4 |  |  |  |  |
+| 23 | 3544 | 4 | send `+$152`/`+$312` (replaced for bytecode sends), C Send `+$324`, script relocation `+$6fc` |  |  |  |
 | 24 | 212 | 0 |  |  |  |  |
 | 25 | 5500 | 3 | AddMenu, GetMenu, SetMenu |  |  |  |
 | 26 | 184 | 0 |  |  |  |  |

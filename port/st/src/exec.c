@@ -111,12 +111,31 @@ static long install_vbl(void) {
     return 0;
 }
 
+/* The servers (the SCI tick H29_1f8, which also runs the sound driver's tick) run on MFP Timer B
+ * at 59.94 Hz instead of the 50 Hz PAL VBL (glue.S tick_dispatch; docs/SOUND.md "Tick rate").
+ * Stopped and the vector restored at exit (shim.c remove_interrupts). */
+extern char tick_dispatch[];
+extern volatile u8 tick_timer;
+u32 old_timerb_vector;
+static long start_tick(void) {
+    old_timerb_vector = *(u32 *)0x120;
+    *(volatile u8 *)0xfffffa1b = 0;                  /* TBCR: stop */
+    *(u32 *)0x120 = (u32)tick_dispatch;
+    *(volatile u8 *)0xfffffa21 = 205;                /* TBDR */
+    *(volatile u8 *)0xfffffa07 |= 1;                 /* IERA: timer B */
+    *(volatile u8 *)0xfffffa13 |= 1;                 /* IMRA */
+    tick_timer = 1;                                  /* the VBL stops running the servers */
+    *(volatile u8 *)0xfffffa1b = 7;                  /* delay mode, prescale 200 */
+    return 0;
+}
+
 void c_AddIntServer(R) {
     struct Interrupt *is = (struct Interrupt *)r->a[1];
     dbg("AddIntServer(%d, \"%s\", code %H)\n", r->d[0], is->node.name, (u32)is->code);
     if (r->d[0] != INTB_VERTB) fatal("AddIntServer: interrupt %d not supported", r->d[0]);
     int i = 0; while (vbl_servers[i]) i++;
     int_disable++; vbl_servers[i] = is; vbl_servers[i + 1] = 0; int_disable--;
+    if (!tick_timer) Supexec(start_tick);
 }
 
 void c_RemIntServer(R) {

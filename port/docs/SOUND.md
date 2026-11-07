@@ -77,8 +77,17 @@ Prog's side (hunks 31, 37):
 ## Which sounds play
 
 208 of the 244 Amiga sounds have a `$13` track; 36 have only MT-32/Amiga tracks (types 6 and
-$c) and stay silent, including 799 (the largest, intro cartoon?), 889, 863, 880. The DOS
-resources are no better (PCjr owners had the same silence), so playing those would mean
+$c). Music coverage check (2026-11-07, against the user's list of 63 songs in `../tracks.txt`):
+every sound the scripts play has an MT-32 track except 699, and 699 is only the YM/Amiga ending
+medley - `cartoonCode`/`ending4` play 799 (MT-32 only) when the driver reports 32 or more voices
+(the MT-32 driver does), 699 otherwise; sound 71 (castle rings) is played only with 8+ voices,
+so never on the YM (by design). On the YM, 4 of the trackless sounds get the DOS `$13` track
+through `makesnd.py` `from_dos`: 50 (labyrinth music, YM-checked: 177 note-ons in room 55), 51,
+785, 787. The other 33 have no `$13` track in DOS either (PCjr owners had the same silence):
+2 3 5 7 24 38 62 71 83 98-100 125 126 150 786 789 799 803 810 859 861-864 880-883 886 889 893
+897 - mostly ambience/effects (24 forest birds, 2/3 desert, 5 mountain wind, 7 sea, 83 fall),
+plus some music (e.g. 126 intro10, 789 bird's nest, 803/880 room 13, 882/883 rooms 6/27, 150
+labyrinth, 893 room 47, 125/897 the battle). Playing those on the YM would mean
 rendering the type-`$c` (or Adlib) tracks on the YM - a possible later extension (the
 interpreter accepts one device type, hunk 37 `+$2124` compares it with the track type).
 
@@ -171,9 +180,64 @@ find the room's sounds with `scidisasm.py` (`pushi 43 ; number`, `push1`, value;
 is often mislabelled with a selector name) and check the region script from `setRegions`.
 Patch files are found when the interpreter starts: restart the game after adding an `N.snd`.
 
-## Tick rate / tempo (open)
+## MT-32 driver (`st/src/mt32.c`, 2026-11-07)
 
-The game and the music run at the VBL rate; Hatari's PAL TOS gives 50 Hz where the Amiga NTSC
-interpreter expects 60 (music 17 % slow). Switching the ST to 60 Hz (`$ff820a`) or a timer-based
-tick would fix the tempo - not done yet. Also open: no noise channel (percussion), the 36 silent
-sounds (above).
+Requested by a player (the ST version of KQ4 had MT-32 support). A file `MT32` in the game folder
+makes `c_LoadSeg` (dos.c) return `mt32_seg` instead of the YM driver (`NOSND` still wins).
+
+- The data is all there: 241 of the 244 Amiga sound resources have a device-`$0C` (MT-32) track,
+  and the Amiga resources include patch 1 (Sierra's MT-32 set-up, 16889 bytes). Prog picks each
+  sound's track by the device the driver reports and sends it MIDI-style events, so the driver
+  is mostly a pass-through to the MIDI ACIA (`$fffc04` status, TDRE = bit 1; `$fffc06` data),
+  busy-waiting per byte (320 us) with running status.
+- GetDeviceInfo: d0 = `$0001_0001` (patch 1), d1 = `$000C_0020` (device `$0C`, 32 voices).
+- **Init's d0 is the channel range** (last << 16 | first, stored in `-$6e86`/`-$6e88`): the
+  interpreter remaps song channels onto free driver channels within it (hunk 37 `+$b42`, search
+  at `+$d2c`, highest free channel first; channels flagged "don't remap" keep their number). The
+  YM driver's `$000f_0000` (0-15) is fine for the YM, but on the MT-32 a second sound (town:
+  music 29 + ambience 886, 2026-11-07) was moved to channels 12-15, which the MT-32 ignores - no
+  town music. The MT-32 driver returns `$0008_0001` (1-8), as Sierra's driver does and ScummVM's
+  `getFirstChannel`/`getLastChannel` (1, 8).
+- Sounds 16 (bee hive, room 11) and 811 have no MT-32 track in the Amiga data; `makesnd.py`
+  `from_dos` copies the DOS one in (`st/hd/16.snd`, `811.snd`; their other tracks unchanged).
+  699 has none in either version.
+- Init uploads patch 1 as Roland DT1 SysEx (`F0 41 10 16 12 addr data sum F7`), layout as in
+  ScummVM `MidiPlayer_Midi::readMt32Patch` (SCI1): before-text to `20 00 00`, patches 1-48 to
+  `05 00 00`, 64 timbres to `08 00 00` + i*`02 00`, `$ABCD` + patches 49-96 to `05 03 00`,
+  `$DCBA` + rhythm key map to `03 01 10` and partial reserve to `10 00 04`, after-text, the
+  6-byte "mystery" message to `52 00 0a`, then reverb config `data[62]` to `10 00 01` and master
+  volume 100 to `10 00 16`. 73 messages, ~17 KB, a 2-VBL pause after each (MT-32 rev 0 needs
+  one): about 6-8 s at start-up. Terminate sends the goodbye text (`data[40..59]`).
+- Events: NoteOn/NoteOff as is (the interpreter ends notes with velocity-0 note-ons); volume
+  (controller 7) is scaled by the game's master volume 0-15 and resent when the master volume
+  or sound on/off changes; controllers 1, 10, 11, `$40`, `$79`, `$7b` pass through, `$4b` (SCI
+  voice allocation) and other SCI-only controllers are only stored for AskDriver; program
+  change and pitch bend pass through; Reverb (11) sends one of the 11 reverb configurations of
+  patch 1.
+- Verified (Hatari, `--midi-in /dev/null --midi-out FILE`; without `--midi-in` Hatari fails to
+  open its default MIDI input and disables MIDI): 73 SysEx messages, all checksums right, display
+  texts correct; the fanfare and title music go out on channels 1-9 with program changes, note-ons
+  and note-offs balance (400/400). The game runs on with `--natfeats no`. Check a capture with
+  `tools/midicheck.py FILE`. **Not yet heard** on a real MT-32 or Munt (no MT-32 ROMs here).
+- Not supported: GM modules (would need ScummVM's MT-32→GM map; KQ5 has no GM tracks) and
+  non-multitimbral synths such as the D-50.
+
+## Tick rate / tempo (fixed 2026-11-07)
+
+The interpreter's clock is the VERTB server `H29_1f8` (registered as "sci-VBlank-Server"): it
+increments the tick counter (`is_Data`), counts seconds every 60 ticks (`cmpi #$3c`) and runs a
+list of timer callbacks (`-$7116(a4)`, each with a countdown/reload at +6/+4 and code at +8),
+which includes the sound driver's Service tick. (`H29_1d4`, the variant used when `-$7b7c` is
+set, skips every sixth call: 60 -> 50.) The shim used to call it from the VBL, 50 Hz on a PAL
+ST, so music and every timed wait ran at 5/6 speed (a player noticed the tempo with the MT-32).
+Now `exec.c start_tick` (on the first AddIntServer) runs the servers from MFP Timer B in delay
+mode, prescale 200, data 205: 2457600 / 200 / 205 = **59.94 Hz**; the VBL stops calling them
+(`tick_timer`). `glue.S tick_dispatch` clears the in-service bit first and drops to IPL 5, so
+the IKBD and MIDI ACIA interrupts are not held up; a tick arriving while the last one runs is
+dropped (`tick_busy`); `int_disable` (Disable()) is honoured as before. `remove_interrupts`
+stops Timer B and restores the `$120` vector at exit. Measured: 599 ticks per 500 VBLs; walking
+benchmark 6.6 game cycles/s against 6.7 for the same build without the timer (the 8.2 in
+GRAPHICS.md is from an older build); Quit reaches a stable desktop with `--natfeats no`. This
+also makes in-game seconds real seconds.
+
+Still open: no noise channel (percussion) on the YM, the 33 sounds without any `$13` track (above).

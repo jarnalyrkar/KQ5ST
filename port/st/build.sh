@@ -20,8 +20,8 @@ for a in alloc: o = (o + 3) & ~3; offs.append(o); o += a
 open('build/hunkstarts.inc', 'w').write('static const u32 hunk_off[] = {' + ','.join(map(str, offs)) + '};\nstatic const int hunk_count = %d;\n' % len(offs))
 PY
 CFLAGS="-m68000 -mstrict-align -fno-store-merging -O2 -ffreestanding -fno-builtin -nostdlib -fomit-frame-pointer -fno-pic -Wall -Wno-unused-function -Isrc -I$B"
-for f in shim exec dos memory display blit blitter input ym; do m68k-linux-gnu-gcc-15 $CFLAGS -c src/$f.c -o $B/$f.o; done
-for f in glue gemdos libgcc68k; do m68k-linux-gnu-gcc-15 $CFLAGS -c src/$f.S -o $B/$f.o; done
+for f in shim exec dos memory display blit blitter input ym mt32; do m68k-linux-gnu-gcc-15 $CFLAGS -c src/$f.c -o $B/$f.o; done
+for f in glue gemdos libgcc68k pmachine; do m68k-linux-gnu-gcc-15 $CFLAGS -c src/$f.S -o $B/$f.o; done
 m68k-linux-gnu-as -m68000 $B/prog.s -o $B/prog.o
 python3 -I $T/elf2prg.py hd/KQ5ST.PRG m68k-linux-gnu-ld -T src/tos.ld -o @OUT@ \
-    $B/glue.o $B/shim.o $B/exec.o $B/dos.o $B/memory.o $B/display.o $B/blit.o $B/blitter.o $B/input.o $B/ym.o $B/gemdos.o $B/libgcc68k.o $B/prog.o
+    $B/glue.o $B/pmachine.o $B/shim.o $B/exec.o $B/dos.o $B/memory.o $B/display.o $B/blit.o $B/blitter.o $B/input.o $B/ym.o $B/mt32.o $B/gemdos.o $B/libgcc68k.o $B/prog.o

@@ -24,6 +24,7 @@ EGA art substituted through SCI patch files (GRAPHICS.md). Prog runs in supervis
 | `st/src/input.c` | ST mouse/keyboard → SCI events, IKBD decoder, event ring, autoplay script (INPUT.md) |
 | `st/src/memory.c` | AllocMem/FreeMem on one big GEMDOS block |
 | `st/src/ym.c` | SCI sound driver for the YM2149 with the `amiga3v.drv` interface (SOUND.md) |
+| `st/src/mt32.c` | SCI sound driver for a Roland MT-32 on the MIDI port, picked by a file `MT32` in the game folder (SOUND.md "MT-32") |
 
 The TOS `.PRG` format also uses absolute 32-bit relocation, so the hunks are concatenated into
 TEXT/DATA/BSS with a merged fixup table. GCC's m68k ABI returns pointers in a0 (all TOS wrappers
@@ -53,9 +54,65 @@ resume mid-function use the `HOOK` macro in `glue.S`.
   `*handle` is NULL (purged). Restoring a save in room 11 (bees, bear) hit `-2(NULL)` → bus error at
   `H59_a1e`, seen by players as a lock-up (2026-10-21).
 - kSetCursor with a position (hunk 17 `+$aa`): moved the pointer via input.device on the Amiga; hooked.
-- Kernel-call trace hook at hunk 4 `+$9ee` (`KTRACE`, WORKFLOW.md).
+- Bytecode interpreter: hunk 4 `+$402` (vector 3, the interpreter loop) → `pm_entry` in
+  `st/src/pmachine.S`, which also replaces `send` (below) and carries the `KTRACE` kernel-call
+  trace that was a hook at `+$9ee` before.
 - Speed: next-fit free-handle search (hunk 59 `+$c16`), verified property-lookup cache in send
-  (hunk 23 `+$22c`), plane 4 skipped in blits and pixel plots (GRAPHICS.md "Performance").
+  (hunk 23 `+$22c`, used by the C-level Send only now), plane 4 skipped in blits and pixel plots
+  (GRAPHICS.md "Performance").
+
+## Bytecode interpreter (`st/src/pmachine.S`, 2026-11-07)
+
+The SCI "PMachine" of Prog is hunk 4 (opcode dispatch loop `+$402`, ~100 handlers, call frame
+`+$308`, calle helper `+$2a8`) and hunk 23 (`send` `+$152`/`+$312`, the C-callable Send `+$324`,
+the script loader's relocation). Both were rewritten for the ST; what follows is what they do,
+since the rewrite keeps every observable effect (checked with `tools/equiv/pmtest.py`,
+WORKFLOW.md "Equivalence tests").
+
+- **Entry.** Hunk 23's send runs a method with `jsr -$7fec(a4)` (vector 3 = hunk 4 `+$402`):
+  a0 = code, a2 = SCI stack; the method's `ret` is an `rts`. Only sends made by bytecode go
+  through `pmachine.S`'s own send; the C-level Send (hunk 23 `+$324`, used by a few kernel
+  functions) keeps Prog's code and enters the loop through `pm_entry`.
+- **Registers while bytecode runs.** Prog: a0 = PC, a2 = SCI stack top (the top word; push =
+  `addq #2,a2` then store), a6 = dispatch table, d2 = `prev` (the acc of the last comparison,
+  pushed by `pprev`), acc and all base pointers in A4 globals. `pmachine.S` adds a3 = globals
+  base, a5 = self and d7 = acc, written back to the globals before every call out of the loop
+  and reloaded after it (kernel functions return their result by writing `-$7134`).
+- **Globals** (A4-relative): `-$7134` acc, `-$7164` rest (bytes pushed by `&rest`, added to the
+  next call frame's argc), `-$7168` params (→ argc word of the frame), `-$716c` temps, `-$7170`
+  locals, `-$7174` globals (script 0 locals), `-$7150` script handle (`*handle` = code base),
+  `-$7148` script number, `-$7160` self, `-$715c` class table (per class: near pointer of the
+  class object or 0, script number), `-$5912` heap base (SCI "near" pointers are word offsets
+  from it, 0 = NULL), `-$717c`/`-$7178` stack base/limit, `-$7180` saved stack top, `-$7184`
+  PC at the last kernel call, `-$7144` PC of the last `callk`, `-$7626` highest kernel number,
+  `-$7816` kernel table. Debug only (not maintained by `pmachine.S`): the send stack `-$726a`
+  (entries at hunk 1 `+$d3c..$d90`), `-$7132` (superclass of the object being sent to), `-$4f3e`.
+- **Operands** are little-endian in the bytecode (read byte-wise, `movep`); the tables the
+  loader byte-swaps in place (selector lists, method dictionaries, export tables) are big-endian.
+- **Scripts can move.** A kernel call or a script load may move any script's code, so across
+  such calls the PC is kept as an offset from the current script's code base and rebased after
+  (or, if the handle is NULL by then, the old absolute PC is used). `calle`/`callb` switch script
+  handle, script number and locals for the callee; `call` keeps them.
+- **Objects.** At `obj-10` the magic `$1234`, `-8` near pointer of the object's script struct
+  (`+$a` handle, `+$e` export table offset, `+$10` locals), `-6` offset of its method dictionary
+  in that script's code, `-4` script struct of the class whose selector list it uses, `-2`
+  property count; property 0 = offset of that selector list, property 1 = near pointer of the
+  superclass. A method dictionary is `count` at `-2`, `count` selectors, a word, then the method
+  offsets. An export table is `count`, then 4-byte entries whose first word is the offset.
+- **send** (frame on the SCI stack: selector, argc, args, repeated; the frame byte is the frame
+  size, `&rest` bytes are added): for each selector the class's selector list is searched
+  (cached, `tabfind`); found → with argc 0 acc = the property, otherwise the property = the first
+  argument. Otherwise the method dictionaries of the object, then of each superclass (property 1)
+  are scanned; found → the method runs with params = this selector's argc word, the script
+  handle of that class's script and its locals, temps saved; not found → PError 5. After the
+  send a2 = the stack top before the frame. `self` sends to self with self unchanged, `super n`
+  to class n with self unchanged, `send` makes the object self for the call.
+- **Errors** go to PError (vector 189, hunk 61 `+$98`, prints the box and exits): 0 export out of
+  range, 1 unknown opcode, 2 kernel number out of range, 3 class not loaded, 4 not an object,
+  5 selector not found, 7 divide by zero, 8 stack overflow (`link`).
+- **Kept from Prog on purpose**: `div`/`mod` by `divs`, `mod` results 0 .. |acc|-1; `shr`/`shl`
+  by acc mod 64; `callk`'s saved a2/a0 and the argc fix-up by `&rest`; the stale a0 (the method
+  dictionary) that PError 4/5 get from inside the class chain.
 
 ## AmigaOS calls
 
@@ -107,8 +164,10 @@ of the address space) fault and need individual patches like `IsObject` (a bus e
 - The TOS VBL queue stopped calling our entry after a while; the shim runs the SCI tick server
   (Prog's VERTB server, registered through AddIntServer) from its own level-4 vector wrapper
   (`pcsample_entry`), which also samples PCs for the profiler.
-- The tick is therefore the VBL: 50 Hz on Hatari's PAL TOS where the Amiga NTSC interpreter
-  expected 60 (game and music 17 % slow, SOUND.md "Tick rate").
+- The tick was therefore the VBL: 50 Hz on a PAL ST where the Amiga NTSC interpreter expected
+  60 (game and music 17 % slow). Since 2026-11-07 the AddIntServer servers run on MFP Timer B at
+  59.94 Hz (`glue.S tick_dispatch`, `exec.c start_tick`); the VBL wrapper still runs the shim's
+  own input/display work and stops calling the servers once the timer runs (SOUND.md "Tick rate").
 - Software key repeat and the mouse globals are updated at interrupt time (INPUT.md).
 
 ## Distribution (open)

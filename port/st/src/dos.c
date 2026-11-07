@@ -305,15 +305,16 @@ void c_Input(R) { r->d[0] = MKBADDR(&con_in); }
 void c_Output(R) { r->d[0] = MKBADDR(&con_out); }
 void c_IsInteractive(R) { struct FileHandle *fh = BADDR(r->d[1]); r->d[0] = fh && fh->console ? -1 : 0; }
 void c_IoErr(R) { r->d[0] = last_error; }
-extern char silent_seg[], ym_seg[];
-/* A file NOSND in the game directory selects the silent driver (testing). */
-static int getenv_nosnd(void) { long h = Fopen("NOSND", 0); if (h < 0) return 0; Fclose(h); return 1; }
+extern char silent_seg[], ym_seg[], mt32_seg[];
+/* Flag files in the game directory pick the sound driver: NOSND = silent (testing), MT32 = Roland
+ * MT-32 on the MIDI port (mt32.c), otherwise the YM2149 (ym.c). */
+static int flag_file(const char *n) { long h = Fopen(n, 0); if (h < 0) return 0; Fclose(h); return 1; }
 void c_LoadSeg(R) {
     const char *name = (const char *)r->d[1]; int n = strlen(name);
     if (n > 4 && !stricmp(name + n - 4, ".drv")) {
-        int silent = getenv_nosnd();
-        dbg("LoadSeg(\"%s\") -> %s sound driver\n", name, silent ? "silent" : "YM2149");
-        r->d[0] = MKBADDR(silent ? silent_seg : ym_seg); return;
+        int silent = flag_file("NOSND"), mt32 = !silent && flag_file("MT32");
+        dbg("LoadSeg(\"%s\") -> %s sound driver\n", name, silent ? "silent" : mt32 ? "MT-32" : "YM2149");
+        r->d[0] = MKBADDR(silent ? silent_seg : mt32 ? mt32_seg : ym_seg); return;
     }
     fatal("LoadSeg(\"%s\") not supported", name);
 }

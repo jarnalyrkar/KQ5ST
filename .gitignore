@@ -21,3 +21,9 @@
 /port/st/dbg/prof.txt
 __pycache__/
 *.pyc
+
+# MT-32 bridge build output and play.sh --munt run files
+port/tools/mt32bridge/build/
+port/tools/mt32bridge/mt32bridge
+port/st/munt.fifo
+port/st/munt.log

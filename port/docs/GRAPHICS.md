@@ -116,6 +116,97 @@ Per-view on purpose: about 160 other views have some matching loops, but mixing 
 loops in a character view would change its colours between directions. The oasis water (view 353)
 converts acceptably and stays Amiga.
 
+### Overlay faces and the beast's slip (2026-11-07)
+
+Player report (zkogur): faces "from a different version" on the harpies (room 91) and on Cassima and
+Graham (room 96, `cassima-graham-talking.jpeg`), and the blue beast changing colour when it slips
+on the peas. Same cause each time: a view that failed `ega_usable` (cel counts or sizes) was
+converted from the Amiga art while the picture under it (or the character's other views) is EGA.
+Room 91's eyes and mouths are props of view 844 and room 96's are props of view 860, placed on
+EGA pictures 91/96. The beast walks in view 884/898 (EGA) and slips in 894/906 (converted,
+dark blue). The DOS scripts place the props at the same x/y as the Amiga scripts (checked with
+`scidisasm.py`, script 96), and composites of EGA picture + EGA cels line up exactly.
+`OVERLAY_VIEWS` in `makest.py` (844, 860, 894, 906) takes the EGA view whenever loop count and
+mirroring match, like `TALKER_VIEWS`. The EGA cel counts differ (860 has more cels, 844 loop 3 has
+one fewer) but the scripts only cycle them or pick cels below both counts. The EGA slip cels are
+about 12% smaller than the Amiga ones, as in the DOS game.
+
+**Sweep of the other face/head props (2026-11-07):** 26 more views with an EGA counterpart were
+checked with `tools/piccomp.py` (prop x/y/loop from the decompiled room scripts). Added to
+`OVERLAY_VIEWS` (clear matches, EGA cleaner): 298 queen bee (room 11), 368 horses (214), 761/763
+Graham and Cedric in the intro (pics 70/71), 773 Crispin (intro9, pic 1), 776/778 Madame Mushka
+and her crystal ball (77), 848/852 the ice queen (92; her close-up face on 93), 933/934/936 the
+ending (65/68/218). Where an EGA loop has fewer cels (848, 933, 934) the scripts only cycle it
+(End/Beg/Fwd/RandCycle, cel 0, NumCels). Left as conversions: 342, 766, 800 (different loop
+count); 469 Jinx and 720 Cedric (animated characters with differently sized cels, props not
+visible in the composite); 757, 768 (props not visible in the composite); 840 room-90 harpies
+(positions set at run time); 176, 178, 624, 688, 806, 824 (positions set at run time or picture
+not found; would need a game run). In the game the harpy close-up (room 91) was checked
+(teleport, `--natfeats no`); the others only as composites.
+
+### Picture 55: the labyrinth backdrop (2026-11-07)
+
+Player report: the labyrinth (room 55) had a white background, so the side openings were hard to
+see (`labyrinth-*.jpeg`). Pic 55 is the only Amiga picture without an embedded cel. It draws its
+black visual with vector fills. On the ST, Prog's pixel plots and blits skip bitplane 4
+(`prog.patch`, RELADD on the pixel table), so the cleared screen reads back as colour 15 instead of
+the clear colour 31. The visual flood fill then sees no clear pixels and never starts, so the
+screen stayed white (colour 15). `makepic.vector_hybrid` builds
+`55.p32`: the EGA visual (all black) as an embedded cel after the palette block, then every `F0`
+(visual on) replaced by `F1` (visual off), so the fills only touch priority/control. Verified:
+re-rendered priority/control byte-identical to the Amiga picture; in Hatari (`--natfeats no`,
+teleport, WORKFLOW.md) the maze shows on black. Any other picture drawn only with visual fills
+would need the same treatment; there are none in KQ5.
+
+### The game folder in ScummVM (2026-11-07)
+
+Checked with `/usr/games/scummvm` 2026.1.0 (`/usr/local/bin/scummvm` lacks libtheoradec) and the
+source in `../scummvm-master`. ScummVM ignores `KQ5ST.PRG` and runs the folder with its own SCI
+interpreter, loading our patch files.
+
+- Detection: `RESOURCE.MAP`/`.000`-`.007` are the untouched Amiga files and match "King's Quest 5 -
+  English Amiga" in `engines/sci/detection_tables.h` (MD5 of the first 5000 bytes + size), so
+  `scummvm --detect --path=st/hd` gives `sci:kq5`, "King's Quest V: Absence Makes the Heart Go
+  Yonder (Amiga/English)". A `.wag` file is no help: only the AGI engine reads one. A distinct
+  name needs a ScummVM detection entry (e.g. `RESOURCE.MAP` + `KQ5ST.PRG`; the entry matching
+  more files wins).
+- Patch files: `engines/sci/resource/resource.cpp` loads `*.v32`/`*.p32` (Amiga view/picture
+  patches), `*.scr`, `.snd`, `.tex`, `.pat`.
+- View format: `detectViewType` looks at the first view 0-999 that is *not* a patch file. With all
+  views patched ScummVM stopped at once with "GfxDefaultDriver: Unknown view type". `makest.py`
+  `UNPATCHED_VIEWS` leaves out 947, a DOS leftover (DOS help script 753 shows it, the Amiga 753
+  uses 942; no Amiga script pushes it or holds it in a property), so ScummVM sees an Amiga view.
+- Colours: ScummVM colours Amiga KQ5 from `spal`, while the ST shim always loads the EGA palette
+  and ignores it. `makest.py` therefore writes `spal` with the EGA colours in 0-15 (16-31 left as
+  the Amiga's; original in `extracted/amiga_files/d0/spal`).
+- Colour count: ScummVM's `kGraph(GetColorCount)` answers 32 for Amiga games, so the scripts would
+  take their Amiga colour branch (white boxes, light blue frames). Script 0 is patched to store 16
+  itself (SCRIPTS.md "16-colour branches").
+- Result (windowed run, separate `--config`/`--savepath`, timed `import` screenshots): Sierra logo,
+  then the cartoon warning over the EGA picture of room 1, grey box with red frame, as on the ST.
+- Not yet checked there: the game beyond the intro, ScummVM's own KQ5 script fixes (they match
+  signatures, so ones hitting scripts we patched are skipped), sound (its Amiga driver ignores the
+  YM `$13` tracks in our `.snd` files). Saves are not interchangeable with the ST.
+
+### Pause panel colours (2026-11-07)
+
+User report: the pause/settings panel (script 755 `KQ5Controls`, view 946: buttons, sliders, slot
+frames, title letters) looked garish in yellow. View 946 is Amiga-only art (the EGA view differs
+completely), and the learned mapping sends the Amiga gold 13 (187,153,68: bevels, slider frames,
+title letters) to EGA yellow 14. `COLOUR_OVERRIDES` in `makest.py` (per view, Amiga colour → EGA
+pair, applied after `plan_view`) maps it to brown 6 for view 946 only, which keeps the Amiga's
+single warm tone with the brown buttons; white 15 and dark grey 8 were the mocked-up
+alternatives. Only `946.v32` changes. Other views keep 13 → 14 (gold coins and the like).
+Second and third user passes: even plain black, the Amiga title lettering (2-pixel strokes,
+1-pixel counters, letters touching: "VOLUME" read as "VOLUWE") was much harder to read than the
+score line, which is drawn in font 69. `TEXT_CELS` in `makest.py` therefore redraws loop 0 cels
+2-5 as black capitals of font 69 on grey 7, opaque and 9 rows high like the originals (the script
+places them bottom-up by `CelHigh`). Capitals, because mixed case is wider and "Detail" ran into
+"Volume" in the mock-up. The cels grow by `pad` columns each side (SPEED 1, DETAIL 2, GAME PAUSED
+2, VOLUME 0); script 755 is patched to move DETAIL and SPEED left by their pad (SCRIPTS.md "Pause
+panel titles centred"; DETAIL moves only 1, keeping clear of the button column's border, so it
+sits 1 pixel right of its slider). An odd spare column goes to the left of the text.
+
 ## Screen formats
 
 - Prog's visual screen: Amiga planar, 5 separate bitplanes, 40 bytes/row, planes 8000 bytes
@@ -153,5 +244,60 @@ converts acceptably and stays Amiga.
   the dithered EGA art consists mostly of 1-pixel RLE runs, where per-run bookkeeping costs more
   than the original per-pixel plotting. The original renderer (with the plane-4 skip) is kept.
 - Remaining cost (cycle profile, blitter on): SCI send ~21%, original cel drawing ~20%, blitter ~6%.
+- **Performance pass 2026-11-07** (walking benchmark `tests/bench_walk.txt`, game cycles in 45 s
+  of emulated time; deterministic, two runs of one build give the same count): 302 -> 326
+  (6.6 -> 7.1 cycles/s, +8%). (1) Kernel-call trace hook (hunk 4 `+$9ee`) skips its register
+  saves and C calls when `KTRACE` is off: 302 -> 315. (2) Hunk 36 polygon geometry helpers
+  (point sub/add `+$2cf2/$2d24`, dot `+$2d56`, cross sign `+$2d7c`, squared distance `+$2dbc`, used
+  by path-finding and polygon tests) replaced by frame-less versions; the squared distance uses
+  `mulu.w` on |dx| instead of the 32-bit library multiply (same low 32 bits since |dx| <= 65535):
+  315 -> 324. (3) Cel drawing opaque runs (hunk 56 `+$578`): one inline loop per colour instead of
+  a per-pixel `jsr` into the 32 plot routines: 324 -> 326 (the four bit-plane writes per pixel
+  dominate; runs are at most 7 pixels and mostly 1-2 in the dithered art, so byte-wise packing
+  does not pay; +0.6 % is within the noise below). All three are proven equal to the originals with `tools/equiv/run.sh`
+  (WORKFLOW.md "Equivalence tests"), and three path-finding walks end on byte-identical screens.
+  Remaining profile (Timer A): SCI `send` 12 % + property lookup 4.4 % + other hunk 23 ~3 %,
+  cel loop ~10 %, hunk 36 polygon code ~7 %, sound tick ~3 %, shim display/blit ~5 %.
+- **Selector lookups in `send` (2026-11-07).** Hatari's cycle profiler (instruction level,
+  `tools/hprofmap.py`) showed the hottest loop in the game was the property scan in
+  `hook_proplookup`: 3.9 % of all cycles, because every *method* send first scans the object's
+  whole property selector list (30-50 entries) and misses. Fix kept: on an index-hint miss,
+  `tabfind` looks the (table, selector) pair up in a 512-entry cache that also stores "absent".
+  It needs no invalidation: each entry keeps the table's count and first/middle/last selector,
+  and in KQ5's 190 scripts (with the `.SCR` patches) the 2341 property/method tables have 192
+  distinct contents and no two different tables share that fingerprint (`tools/equiv/tabproof.py`),
+  so an entry can never describe another table loaded at the same address later. Tables of 8 or
+  fewer entries are scanned plainly. Proven register-exact against the original (`sendtest.py`,
+  20000 lookups with tables replaced at reused addresses; a mutant without the fingerprint is
+  caught). Cycle profile: lookup cost 5.6 % -> ~3.8 % of cycles. A second hook for the method
+  dictionary scan (`+$286`) gave nothing (most tables have under 3 entries) and was removed.
+- **Bytecode interpreter rewrite (2026-11-07, `st/src/pmachine.S`, ARCHITECTURE.md "Bytecode
+  interpreter").** Hunk 4's dispatch loop and all opcode handlers, the call frame and `calle`
+  helper, and hunk 23's `send` for bytecode sends are replaced. Loop: acc in d7, globals base in
+  a3, self in a5 (Prog reloaded them from memory in every handler), written back only around
+  calls out of the loop; dispatch is still `move.b (a0)+ / add / move.w (a6,d1.w) / jmp` (no
+  cheaper form exists on a 68000). Send: the write-only debug send stack, `-$7132` and `-$4f3e`
+  are dropped; locals are switched only when a method is called; script handle, locals, PC and
+  params are saved only once a selector turns out to be a method, so property reads/writes
+  (`(ego x?)`, `(ego x: 10 y: 20)`) run a short loop (`pm_sendfast`); the selector-table cache
+  (`tabfind`, moved here from glue.S) is kept. Measured with `tools/bench3.py` (game cycles in
+  45 s of each scene): loop only: walk 328 -> 326, town 381 -> 379, bakery 1647 -> 1641 (nothing:
+  the loop was ~4.5 % of the time, send ~16 %); with send: 328/392/1710; with the send trimmed:
+  341/412/1775; with the property fast path: **345/420/1791, sum 2356 -> 2556 (+8.5 %)**. Timer-A
+  profile of the walk: interpreter + send 25 % of samples before, 17 % after; what remains is
+  the class-chain walk per method send (~4 %), kernel-call dispatch and the per-selector work.
+  Proven equal to Prog's interpreter with `tools/equiv/pmtest.py` (WORKFLOW.md "Equivalence
+  tests": 900 random worlds per build, every opcode and error path, scripts moved under the
+  running code). Not done: a cache that skips the class-chain walk (a method result depends on
+  the whole chain; the table-fingerprint argument only identifies table contents, and KQ5's
+  rooms share dictionary layouts, so an exact key was not found), and the C-level Send of
+  kernel functions (hunk 23 `+$324`, ~2.5 %) still uses Prog's code.
+- **Measuring:** the three-scene benchmark `tools/bench3.py` (room 1 walk, the user's "The Town"
+  and "The Bakery" saves restored with `st/tests/bench_save.txt`) sums game cycles; start of day
+  -> end: walk 302 -> 345 (+14 %), town 358 -> 420 (+17 %), bakery 1537 -> 1791 (+17 %). Game
+  cycles are CPU-bound: `Game::play` is `(self doit:) (Wait gSpeed)` and a cycle takes ~8 ticks.
+- **Benchmark noise between builds:** one build always gives the same cycle count, but two
+  different builds shift timing, so game events (Cedric, random actions) drift and the count
+  moves by a few cycles (~1-2 %). Treat differences under ~3 % as noise.
 - The Speed slider / `egoMoveSpeed` default (why Graham crawled at 8 cycles/s): SCRIPTS.md.
 - Open: faster display updates; the 1 MB memory target (ARCHITECTURE.md "Memory").

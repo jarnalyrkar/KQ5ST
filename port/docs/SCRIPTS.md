@@ -63,6 +63,18 @@ only 206 patched):
 Short moves (battle 124, castle cat, rm067 at 1037, spiderRegion) are left alone. Settings of 1
 (rm004, rm009, rm010, rm047, ...) are probably fine but double the time.
 
+## Detail level on the ST (2026-11-07)
+
+Room 99 (the speed test before the game starts) counts game cycles for 60 ticks. On a slow
+machine it sets `howFast` 0 and **detail level 1**, otherwise `howFast` 2 (the default
+`_detailLevel` in Game is 3). The ST counts as slow, so every effect gated on
+`detailLevel == 3` is missing unless the player raises the Detail slider in the settings panel:
+for example the fire in room 56 (castle library-like room, view 680 loop 5; a player felt
+"something is missing", `library.jpeg`) and the waterfall in room 40. 35 room scripts check
+`detailLevel` (`grep -l detailLevel amiga-decompiled/*.sc`). Not patched: raising the default
+costs speed (room 40 already felt slow to the player). An option would be to `init` such props
+without `setCycle` at lower detail levels, so they are drawn but not animated.
+
 ## The patches
 
 - **Speed default** - script 0 `+$8e4`: `KQ5::init` sets `egoMoveSpeed: 2`; patched to 0. The
@@ -118,6 +130,21 @@ Short moves (battle 124, castle cat, rm067 at 1037, spiderRegion) are left alone
   (speed 3, not under HandsOff) and `stdWalkOut` (take-off, speeds 0/1, ~2 s). The alternative,
   `HandsOn` at the start of the walk-in, was not taken: the room's exits and the owl's
   `stdWalkOut` would then race the still-running `stdWalkIn`.
+- **16-colour branches** - script 0 `+$845` (2026-11-07, for ScummVM): `KQ5::init` stores
+  `kGraph(GetColorCount)` in global 105 (the only GetColorCount call in KQ5); `push1; push2; callk
+  Graph 2` becomes `ldi 16` (word form) + `ldi 16` (byte form), 5 bytes, nothing pushed. No effect
+  on the ST (Prog already answers 16, `prog.patch` hunk 55); ScummVM answers 32 for Amiga KQ5
+  (GRAPHICS.md "The game folder in ScummVM").
+- **Pause panel titles centred** - script 755 `gcWin::open` (2026-11-07, goes with the redrawn
+  titles in view 946, GRAPHICS.md "Pause panel colours"). The titles are drawn with `DrawCel` at
+  their top-left; GAME PAUSED is centred by its `CelWide`, but DETAIL (loop 0 cel 4, x 73) and
+  SPEED (cel 2, x 156) use fixed x values: per-language constants picked by the local procedure
+  `$000e` (`printLang`; English = its 5th argument) plus a final `ldi 10; add`. The new cels are
+  2 / 1 pixels wider on each side; `ldi 10` becomes 9 for both (`+$9dc`, `+$ad9`), which moves
+  every language's x (only English is shipped). DETAIL moves only 1 of its 2: at 2 the opaque cel's
+  left column covered the button column's border line at screen x 133 (user report). Measured in a
+  headless `--natfeats no` run (`tests/settings.txt`): DETAIL, VOLUME, SPEED centred at x 152,
+  191, 230.5 over slider slots at 151, 191, 231; the border stays intact.
 - **Copy protection off** - scripts 22, 30, 216, 220 (2026-10-17), as in the CD release. KQ5's
   manual check is `CPCheck::doit` in script 754 (text 754 = "Incorrect, please try again."): it
   shows the room's prompt ("The door to the witch's house has an enchantment on it ... Use

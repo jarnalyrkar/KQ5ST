@@ -158,6 +158,43 @@ re-rendered priority/control byte-identical to the Amiga picture; in Hatari (`--
 teleport, WORKFLOW.md) the maze shows on black. Any other picture drawn only with visual fills
 would need the same treatment; there are none in KQ5.
 
+### Second player report: the bear, the pantry cupboard, the maze colour (2026-11-08)
+
+zkogur confirmed the 2026-11-07 fixes (harpies blink, Cassima and Graham look right, the blue
+beast keeps its colour) and reported three more things, all art-set choices in `makest.py`:
+
+- **The bear turns black when disturbed or when the fish is thrown** (room 11,
+  `bear-changes-color-like-the-blue-monster-did.jpeg`). The idle bear is views 1110-1114, Amiga-only
+  numbers: the Amiga release split the DOS bear view **302** into five views, each holding one
+  real loop (loop N of 111N) behind 1x1 placeholder loops. They were Amiga conversions (grey 8 with
+  light-grey 7 fur), while the disturbed/fed bear is views 304/308, EGA since the start, where the
+  bear is black with dark-grey shading. `EGA_SOURCE` in `makest.py` now takes loop N of the EGA
+  302 for view 111N (report source `ega-302`); the placeholder loops stay converted. EGA 302 has
+  more cels in loops 0 and 4 (6/11 against 4/8); `bearScript` cycles both with `End`, so the
+  animation is only longer. The bear is only present when Graham carries the fish (`rm011::init`,
+  item 5), so a debug teleport into room 11 shows no bear.
+- **The cupboard left of the pantry entrance** (room 56, the room after the labyrinth,
+  `library-left-cupboard-looks-off.jpeg`): view 680 (cupboard doors, bag of peas, open interior,
+  fire, Graham reaching in) failed `ega_usable` on loop 2 alone (8 Amiga cels, 7 EGA, cycled with
+  `End`), so its converted cels, with the Amiga's opaque grey background block, sat on the EGA
+  picture. Added to `OVERLAY_VIEWS`; `piccomp.py` composites of picture 56 with the EGA cels at the
+  script positions (51,142 / 55,125 / 55,91 / 34,75 / 169,156) line up exactly.
+- **Labyrinth walls white instead of light grey** (room 55, `labyrinth-3-change-white-for-light-gray.jpeg`).
+  The walls are `mazePiece`s of script 603 from views 877 (side walls, already EGA: dark grey 8
+  dithered with black, light-grey 7 edges) and 878 (front walls, floor, ceiling, openings), which
+  was an Amiga conversion because its loop 4 has a 1x1 placeholder cel before the wall cel
+  (script 603 draws `878 4 1`; the DOS script 55 draws `878 4 0`). The learned colour map turned
+  the Amiga colour 3 of that view into white 15. `PAD_CELS` in `makest.py` puts a 1x1 transparent
+  cel in front of the EGA loop so the Amiga cel numbers apply; the view then passes `ega_usable`
+  and the whole maze is the EGA art: no white anywhere, dark grey with light-grey 7 edges, like
+  the DOS EGA game (the player's guess). Checked in Hatari with `--natfeats no` (debug teleport
+  to rooms 55 and 56, `scratch` copies of `st/hd`): maze on black in greys, cupboard matching the
+  picture.
+
+The scan behind the bear fix (`Amiga-only views with 1x1 placeholder loops, matched by cel count
+and size against every DOS loop`) found no other split view; the other Amiga-only views (166,
+251, 769, 775-785 odd, 891-901, 1041-1103, 1120, 1998, 1999) have no DOS counterpart to take.
+
 ### The game folder in ScummVM (2026-11-07)
 
 Checked with `/usr/games/scummvm` 2026.1.0 (`/usr/local/bin/scummvm` lacks libtheoradec) and the

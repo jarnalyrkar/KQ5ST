@@ -127,8 +127,35 @@ TALKER_VIEWS = {75, 101, 102, 129, 161, 197}
 # 773 Crispin (intro9, pic 1), 776/778 Madame Mushka and her crystal ball (77), 848/852 ice queen
 # (92/93), 933/934/936 ending scenes (65/68/218). Where an EGA loop has fewer cels the scripts
 # only cycle it (End/Beg/Fwd/RandCycle, cel 0 or NumCels).
+# 680 = the pantry cupboard of Mordack's castle (room 56: cupboard doors, bag of peas, the open
+# cupboard's interior, the fire, Graham reaching in): the converted Amiga cels sat on an opaque
+# grey block over the EGA picture (player report 2026-11-08); only loop 2 differs (8 vs 7 cels,
+# cycled with End).
 OVERLAY_VIEWS = {844, 860, 894, 906,
-                 298, 368, 761, 763, 773, 776, 778, 848, 852, 933, 934, 936}
+                 298, 368, 761, 763, 773, 776, 778, 848, 852, 933, 934, 936,
+                 680}
+
+# EGA loops that need 1x1 transparent placeholder cels in front so the Amiga scripts' cel numbers
+# apply: {view: {loop: count}}. 878 = the labyrinth walls (script 603 `mazePiece`s on picture
+# 55): the Amiga loop 4 is [1x1 dummy, wall], the EGA loop 4 is [wall], and script 603 draws
+# `878 4 1` where the DOS script 55 draws `878 4 0`. With the pad the view passes ega_usable, so
+# the walls take the EGA art (dark grey 8 with light grey 7 edges, like the EGA side walls 877)
+# instead of the Amiga conversion, whose colour 3 became white 15 (player report 2026-11-08).
+PAD_CELS = {878: {4: 1}}
+
+# Views drawn from another EGA view's loops: {amiga_view: (ega_view, {amiga_loop: ega_loop})}.
+# The Amiga release split the DOS bear view 302 (room 11) into 1110-1114, each holding one real
+# loop (loop N of 111N) behind 1x1 placeholder loops. The bear's other views 304/308 (disturbed,
+# fed) are EGA, so the converted grey Amiga bear turned black when disturbed (player report
+# 2026-11-08). EGA 302 has more cels in loops 0 and 4 (6/11 vs 4/8); the script cycles them with
+# End. The placeholder loops stay converted.
+EGA_SOURCE = {1110: (302, {0: 0}), 1111: (302, {1: 1}), 1112: (302, {2: 2}),
+              1113: (302, {3: 3}), 1114: (302, {4: 4})}
+
+def pad_cels(e, n):
+    for l, count in PAD_CELS.get(n, {}).items():
+        e[l]['cels'][0:0] = [dict(w=1, h=1, dx=0, dy=0, key=KEY, px=bytes([KEY])) for _ in range(count)]
+    return e
 
 # Views that fail ega_usable as a whole but where some loops match the Amiga ones (same cel count,
 # sizes within the ega_usable tolerance): those loops take the EGA art, the rest stay converted.
@@ -189,8 +216,16 @@ def main():
         orig = open(f'{R}/res_amiga/view/{n}', 'rb').read()
         a = decode(orig, 'amiga')
         src = 'amiga-16'
-        if os.path.exists(f'{R}/res_dos/view/{n}'):
-            e = decode(open(f'{R}/res_dos/view/{n}', 'rb').read(), 'ega')
+        if n in EGA_SOURCE:
+            ev, lmap = EGA_SOURCE[n]
+            eg = ega_loops(decode(open(f'{R}/res_dos/view/{ev}', 'rb').read(), 'ega'))
+            loops = converted_loops(a, pal, co, n)
+            for al, el in lmap.items():
+                assert eg[el]['mirror'] == a[al]['mirror'], (n, al)
+                loops[al] = eg[el]
+            src = f'ega-{ev}'
+        elif os.path.exists(f'{R}/res_dos/view/{n}'):
+            e = pad_cels(decode(open(f'{R}/res_dos/view/{n}', 'rb').read(), 'ega'), n)
             if ega_usable(e, a) or (n in TALKER_VIEWS | OVERLAY_VIEWS and same_loops(e, a)): loops, src = ega_loops(e), 'ega'
             else:
                 loops = converted_loops(a, pal, co, n)

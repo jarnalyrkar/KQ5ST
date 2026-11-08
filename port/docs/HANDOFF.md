@@ -1,4 +1,4 @@
-# Hand-off: where the KQ5 Atari ST port stands (2026-11-07)
+# Hand-off: where the KQ5 Atari ST port stands (2026-11-08)
 
 Read this first, then the area file you need (index: [`README.md`](README.md)). This file holds
 state only; how things work is in the area files.
@@ -136,6 +136,25 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
   save-restore testing in WORKFLOW.md.
 - **`READ_ME.TXT`**: MT-32 section; stale double-click line and "music 17 % slow" removed.
 
+## Work of 2026-11-08 (released as v0.2.1)
+
+- **zkogur on v0.2.0**: harpies blink, Cassima/Graham faces and the blue beast are fixed. Three
+  new art reports, all fixed in `makest.py` and the regenerated art set in `st/hd` (only
+  `680.v32`, `878.v32`, `1110-1114.v32` changed; GRAPHICS.md "Second player report"):
+  - the bear (room 11) turned black when disturbed: idle views 1110-1114 now take their loops
+    from the EGA bear view 302 (`EGA_SOURCE`), matching the EGA views 304/308 of the disturbed
+    and fed bear;
+  - the pantry cupboard after the labyrinth (room 56, view 680) is EGA (`OVERLAY_VIEWS`);
+  - the labyrinth walls (view 878) are EGA, so no white: dark grey with light-grey edges like the
+    EGA side walls (`PAD_CELS` adds the placeholder cel the Amiga scripts expect in loop 4).
+  Checked with `--natfeats no` (debug teleport): rooms 55 and 56 look right; `piccomp.py`
+  composites line up for 680 and 878; the bear views were checked as cel sheets (see the next
+  line for the game run).
+  **The bear itself was not seen in a game run**: it only exists when Graham carries the fish,
+  a debug teleport arrives without inventory, and the debug "From Inv. #" key (8704) did not open
+  its dialog headless (WORKFLOW.md "Jumping to any room"). zkogur to confirm, or play to the bear
+  with the fish in `play.sh`.
+
 ## Known gaps / risks
 
 0. Start-up from a real hard disk was slow (~94 s black screen in Hatari's ACSI emulation);
@@ -164,7 +183,8 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
 
 ## Next
 
-- zkogur to try v0.2.0 (art fixes, MT-32, tempo, speed, interpreter rewrite).
+- zkogur to confirm v0.2.1 (bear, cupboard, maze) along with the rest of v0.2.0 (MT-32, tempo,
+  speed, interpreter rewrite).
 - User to re-listen with Munt: town and bee-hive music, overall tempo vs the original.
 - Room 40 soft lock: get zkogur's save or steps.
 - Overlay views left as conversions (GRAPHICS.md "Sweep") need a game run to check.

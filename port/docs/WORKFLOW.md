@@ -72,6 +72,14 @@ lists only the wanted save (format: 2-byte big-endian save number, name, `\n`, .
 run `tests/restore.txt`. With `MT32` present the start-up is ~6 s longer (SysEx upload): add ~700
 VBLs to the script times. Used for rooms 40 and 55 (player report 2026-11-07). The new room
 starts from its default state (no inventory, flags unset).
+Notes from 2026-11-08: in debug mode the game asks "Teleport to:" right at start-up (from
+about VBL 500, before the "played before?" box), so type the room there (`2000 key 49` ...,
+`key 13`); a later `key 5120` opens it again in-room. The debug key 8704 ("From Inv. #"/"To
+Inv. #", gives Graham inventory items) did not open its dialog in a headless run (reason not
+found), so a teleported room has no inventory-dependent actors (the bear of room 11 needs the
+fish). With `--natfeats no` the `quit` autoplay command cannot end Hatari (`nf_exit` is a no-op):
+use `--run-vbls` or a `timeout`, otherwise the shim's 250-VBL auto-shots run on until the
+`SHOTnn` counter overflows into garbage file names (~2900 files, 85 MB in 280 s).
 Click coordinates are screen coordinates (picture y + 10). `key 20480` (down arrow) did not walk
 Graham in a headless run; clicks do. Hatari takes screenshots on its own every ~250 VBLs as well
 as on `shot`.

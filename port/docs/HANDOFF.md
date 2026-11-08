@@ -155,7 +155,7 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
   its dialog headless (WORKFLOW.md "Jumping to any room"). zkogur to confirm, or play to the bear
   with the fish in `play.sh`.
 
-## Work of 2026-11-08, later (v0.2.2 zip built, not yet published)
+## Work of 2026-11-08, later (released as v0.2.2, pre-release)
 
 - **zkogur confirmed v0.2.1** ("all changes look good") and reported two things in the labyrinth:
   - **Dink's animation has a couple of frames where black turns blue** - fixed in the art set
@@ -199,8 +199,7 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
 
 ## Next
 
-- Publish v0.2.2 (`dist/KQ5ST-v0.2.2.zip`: Dink colours, labyrinth soft lock) and ask zkogur to
-  confirm; the bear in a game run (with the fish) is still unconfirmed, as is v0.2.0's MT-32,
+- zkogur to confirm v0.2.2 (Dink colours, labyrinth soft lock; published 2026-11-08); the bear in a game run (with the fish) is still unconfirmed, as is v0.2.0's MT-32,
   tempo, speed and interpreter rewrite beyond "all changes look good" on v0.2.1.
 - User to re-listen with Munt: town and bee-hive music, overall tempo vs the original.
 - Room 40 soft lock: get zkogur's save or steps.

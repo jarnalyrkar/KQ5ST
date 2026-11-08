@@ -84,6 +84,21 @@ Click coordinates are screen coordinates (picture y + 10). `key 20480` (down arr
 Graham in a headless run; clicks do. Hatari takes screenshots on its own every ~250 VBLs as well
 as on `shot`.
 
+### Dink test (2026-11-08)
+
+`python3 -I tools/mkdinktest.py DIR` makes a test copy of `st/hd` (debug keys on, no saves) whose
+`55.SCR` drops Graham into Dink's square (3,1) with the tambourine in inventory, moves the hug
+rectangle out of the drop-in spot and runs the tambourine branch on the Talk verb (the inventory
+cursor cannot be selected headless). `st/tests/dink_leave.txt` (18600 VBLs, `--natfeats no`,
+`--harddrive DIR`) teleports to 55, gives the tambourine, walks out of the square and back and
+picks up the hairpin; its header says what to expect. The scene is a good stress test for the
+sound/animation code too (RandCycle, three `playBed` changes, a `MoveTo` off-screen). Autoplay
+notes learned here: after `HandsOn` the current icon is still the one last chosen, so select the
+walk cursor with keypad 0 (`key 20992`, Insert) before a walk click; keypad 5 (`key 19456`)
+cycles Walk → Look → Do → Talk; a click below the floor (screen y 190) walks Graham to the bottom
+edge, which is the "turn around" control colour of the maze. The shim takes a screenshot every
+~250 VBLs on its own, so number the explicit `shot`s by content, not by file name.
+
 ### MT-32 in Hatari (2026-11-07)
 
 `st/play.sh --mt32 DEVICE [hatari args]` creates `hd/MT32` for the run (removed afterwards unless

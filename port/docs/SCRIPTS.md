@@ -163,3 +163,21 @@ without `setCycle` at lower detail levels, so they are drawn but not animated.
   (room 64) also uses the symbol alphabet but is only flavour text; the spell icons (view 712
   loop 2) and the "Select spell to cast" logic (room 124) are identical in the CD version and
   untouched. Not play-tested (the rooms are far into the game).
+- **Labyrinth: leaving Dink's square without the hairpin** - script 55 `+$11fc`
+  `giveTamboScript::changeState` state 12 (2026-11-08, zkogur: "if you leave the screen without
+  picking up the pin he drops you cannot get back to the floor, soft lock"). After Dink dances
+  and drops the hairpin, state 11 walks him off and state 12 restarts the maze music, freezes
+  the pin, calls `HandsOn` and `(UnLoad SOUND 889)` - and sets no `cycles`/`seconds`, so state 13
+  (`dink dispose`, `self dispose`) is dead code and the room keeps `giveTamboScript` as its
+  script. `rm055::doit` only tests the control colours for a maze-square change when `script`
+  is 0 (`(cond (script (script doit:)) ((== temp0 8) ...)`), and `localproc_0` has set
+  `illegalBits 0`, so Graham walks through an exit or off the bottom of the floor and nothing
+  happens; only `getHairPinScript` (picking up the pin) replaces the script and frees the maze.
+  The DOS script ends state 12 with `(self dispose:)`. Patch: the 10-byte `push2; pushi 132;
+  pushi 889; callk UnLoad 4` becomes `ldi 1; aTop cycles` (`35 01 65 10`) + `jmp +3` + padding,
+  so state 13 runs on the next cycle (sound 889 is purged like any other resource). Reproduced
+  and verified headless with `--natfeats no` (`tools/mkdinktest.py`, `tests/dink_leave.txt`;
+  WORKFLOW.md "Dink test"): original script - Graham stops half off the floor and the square
+  never changes; patched - the square redraws, walking back shows the pin where it fell and the
+  Do cursor picks it up ("Graham reaches down and grabs the hairpin ..."). ScummVM loads the
+  same `55.SCR`.

@@ -1,0 +1,28 @@
+# Dink's hairpin and leaving the square (player report 2026-11-08). Game folder from
+# tools/mkdinktest.py (debug keys on, starts in a Dink square with the tambourine, Talk verb =
+# give the tambourine). Run 18600 VBLs with --natfeats no. Teleport to 55, Talk cursor (keypad 5
+# x3), click Dink -> the whole tambourine scene (~5000 VBLs), walk cursor (keypad 0 = Insert),
+# walk to the bottom edge -> turn around into the next square, again -> back into Dink's square,
+# the hairpin lies at 240,151 (screen coordinates); Do cursor (keypad 5 x2), click it.
+# Expect: the square redraws on each bottom-edge walk (fixed 55.SCR; with the original script
+# Graham stops half off the floor and the square never changes), then "Graham reaches down and
+# grabs the hairpin off the labyrinth floor."
+2000 key 53
+2100 key 53
+2200 key 13
+5600 key 19456
+5700 key 19456
+5800 key 19456
+6000 click 190 125
+12500 key 20992
+12600 shot
+12700 click 160 190
+13900 shot
+14000 click 160 190
+15200 shot
+15300 key 19456
+15400 key 19456
+15500 shot
+15600 click 240 151
+17000 shot
+18500 shot

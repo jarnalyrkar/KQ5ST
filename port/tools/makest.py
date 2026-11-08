@@ -57,7 +57,13 @@ def ega_loops(e):
 # 946 = pause/settings panel (script 755 KQ5Controls): the Amiga gold 13 (bevels, slider frames,
 # title letters) maps to EGA yellow 14, which glared on the grey window (player report 2026-11-07);
 # brown 6 keeps the Amiga's single warm tone with the brown buttons.
-COLOUR_OVERRIDES = {946: {13: (6, 6)}}
+COLOUR_OVERRIDES = {946: {13: (6, 6)},
+                    # Dink (labyrinth, room 55): Amiga 0 = Graham's black tights, present only in
+                    # the cels where Graham stands inside Dink's view (the hug, the tambourine, the
+                    # dance). The de-collision pushed it off black (Dink's body, Amiga 1) and dark
+                    # grey (Amiga 2) to blue, so those frames flashed blue legs (player report
+                    # 2026-11-08). Keep black, as in the walking view 0.
+                    873: {0: (0, 0)}, 874: {0: (0, 0)}, 1060: {0: (0, 0)}}
 
 # Cels redrawn as text: {view: {(loop, cel): (text, pad)}}. 946 loop 0 cels 2-5 = the panel titles
 # (Amiga: 2-pixel strokes with a gold outline, unreadable in 16 colours; user, 2026-11-07). Redrawn

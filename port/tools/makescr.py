@@ -155,6 +155,14 @@ PATCHES = [
     # column's border line at screen x 133 (user, 2026-11-07): x 72, text 1 pixel right of its slot.
     (755, 0x9dc, b'\x35\x0a\x02', b'\x35\x09\x02'),
     (755, 0xad9, b'\x35\x0a\x02', b'\x35\x09\x02'),   # SPEED (loop 0 cel 2), pad 1: x 156 -> 155
+    # Labyrinth soft lock after Dink drops the hairpin (player report 2026-11-08). The Amiga
+    # giveTamboScript (script 55) ends its state 12 with HandsOn and `(UnLoad SOUND 889)` but
+    # never cues state 13 (dink dispose, self dispose): the room keeps the script, and
+    # rm055::doit only changes maze square while `script` is 0, so Graham walked out of the
+    # square into nothing unless he picked up the hairpin (getHairPinScript replaces the script).
+    # The DOS script disposes itself in state 12. Replace the UnLoad with `(= cycles 1)` (ldi 1;
+    # aTop cycles) and jump over the rest, so state 13 runs on the next cycle.
+    (55, 0x11fc, b'\x7a\x38\x84\x00\x38\x79\x03\x43\x01\x04', b'\x35\x01\x65\x10\x32\x03\x00\x00\x00\x00'),
 ]
 METHODS = []
 HOOKS = [

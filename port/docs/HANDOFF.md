@@ -1,4 +1,4 @@
-# Hand-off: where the KQ5 Atari ST port stands (2026-11-08)
+# Hand-off: where the KQ5 Atari ST port stands (2026-11-08, evening)
 
 Read this first, then the area file you need (index: [`README.md`](README.md)). This file holds
 state only; how things work is in the area files.
@@ -155,6 +155,22 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
   its dialog headless (WORKFLOW.md "Jumping to any room"). zkogur to confirm, or play to the bear
   with the fish in `play.sh`.
 
+## Work of 2026-11-08, later (v0.2.2 zip built, not yet published)
+
+- **zkogur confirmed v0.2.1** ("all changes look good") and reported two things in the labyrinth:
+  - **Dink's animation has a couple of frames where black turns blue** - fixed in the art set
+    (GRAPHICS.md "Third player report"): Graham's black tights inside the Dink views 873/874/1060
+    were pushed to blue by the conversion's de-collision; `COLOUR_OVERRIDES` pins Amiga 0 to black
+    there. Only `873.v32`, `874.v32`, `1060.v32` changed. Verified headless (no blue in 60 shots).
+  - **Leaving the square without the hairpin soft-locked the game** - an Amiga script bug
+    (SCRIPTS.md "Labyrinth: leaving Dink's square"): `giveTamboScript` never leaves state 12, so
+    the room keeps a script and `rm055::doit` stops changing maze squares; Graham walks off the
+    floor. New `55.SCR` (`makescr.py`) cues state 13. Reproduced with the original script and
+    verified fixed with `--natfeats no` (`tools/mkdinktest.py` + `tests/dink_leave.txt`,
+    WORKFLOW.md "Dink test"): leave, come back, the pin is there, picked up. The DOS script has
+    no such bug (it disposes itself in state 12).
+- No shim code changed; `KQ5ST.PRG` is the v0.2.1 binary.
+
 ## Known gaps / risks
 
 0. Start-up from a real hard disk was slow (~94 s black screen in Hatari's ACSI emulation);
@@ -183,8 +199,9 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
 
 ## Next
 
-- zkogur to confirm v0.2.1 (bear, cupboard, maze) along with the rest of v0.2.0 (MT-32, tempo,
-  speed, interpreter rewrite).
+- Publish v0.2.2 (`dist/KQ5ST-v0.2.2.zip`: Dink colours, labyrinth soft lock) and ask zkogur to
+  confirm; the bear in a game run (with the fish) is still unconfirmed, as is v0.2.0's MT-32,
+  tempo, speed and interpreter rewrite beyond "all changes look good" on v0.2.1.
 - User to re-listen with Munt: town and bee-hive music, overall tempo vs the original.
 - Room 40 soft lock: get zkogur's save or steps.
 - Overlay views left as conversions (GRAPHICS.md "Sweep") need a game run to check.

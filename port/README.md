@@ -35,6 +35,7 @@
   - `sndvoices.py SOUND|N.snd [PATCH101] OUTDIR` — render every channel of a sound resource to wav files to pick voices by ear
   - `hunk2gas.py` / `elf2prg.py` — Prog hunks → GNU as source, ELF → TOS PRG (used by `st/build.sh`)
   - `mkrelease.sh VERSION` — pack `st/hd` and `READ_ME.TXT` into `dist/KQ5ST-VERSION.zip` for a GitHub release
+  - `mkdinktest.py OUTDIR` — test copy of `st/hd` that starts in Dink's labyrinth square with the tambourine (debug keys on, test-only script patches; `docs/WORKFLOW.md` "Dink test")
   - `st2png.py SHOT.ST...` — convert ST screenshots; `sym.py` — resolve shim addresses; `profsum.py` — summarise profiles (`docs/WORKFLOW.md`)
 - `previews/` — rendered comparison sheets
 

@@ -195,6 +195,31 @@ The scan behind the bear fix (`Amiga-only views with 1x1 placeholder loops, matc
 and size against every DOS loop`) found no other split view; the other Amiga-only views (166,
 251, 769, 775-785 odd, 891-901, 1041-1103, 1120, 1998, 1999) have no DOS counterpart to take.
 
+### Third player report: Dink's blue frames (2026-11-08)
+
+zkogur: "the animation with Dink has a couple of frames where black turns blue". Dink is views
+873 (idle, blink, the hug), 874 (the dance, Graham with the tambourine in loop 5, the 4-pixel
+hairpin in loop 4) and 1060 (the hairpin shake, Graham's dance in loop 1), all `amiga-16`
+conversions (the EGA 873/874 fail `ega_usable`, 1060 has no EGA counterpart, and the EGA Dink
+is blue all over). Per cel, the only Amiga colour 0 (black) pixels are Graham's tights and
+boots in the cels where he stands inside Dink's view: 873 loop 6 cels 3-8 (the hug), 874 loop 2
+cel 0 and 1060 loop 0 cels 0/6/7 (handing over the tambourine), 874 loop 5 and 1060 loop 1 (his
+dance). `egaconvert.plan_view`'s de-collision found black (152-2275 pixels) next to Dink's body
+(Amiga 1 → EGA 0, 10-60 k pixels) and next to Amiga 2 (→ dark grey 8), and moved the rarer colour
+twice: off black to dark grey, then off dark grey to the next candidate, blue 1. Graham's own
+walking view 0 keeps Amiga 0 black, so the tights flipped to blue for exactly those frames.
+`COLOUR_OVERRIDES` now pins Amiga 0 to black for 873, 874 and 1060 (only those three `.v32`
+changed). Checked in the headless Dink run (WORKFLOW.md "Dink test"): no EGA blue beyond
+Graham's hat in any of the 60 screenshots of the hug, the hand-over and the dance.
+
+The same scan (`plan_view` over the 186 converted views, Amiga 0 used but not mapped to black)
+lists 40 views: 20 where black became dark grey 8 (30, 152, 200, 286, 299, 516, 540, 547, 630,
+712, 764, 765, 771, 892, 893, 941, 1102, 1103 and the two above) and 19 more where it became
+blue: 26, 27, 176, 221, 242, 252, 259, 342, 462, 469, 739, 762, 775, 782, 818, 846, 935, 1041,
+1101. In most of them black is a large share of every cel (outlines of a dark figure), so the
+whole view is consistently "blue-black" rather than flashing; not changed, to be judged in a game
+run (candidates for the same override if a player reports them).
+
 ### The game folder in ScummVM (2026-11-07)
 
 Checked with `/usr/games/scummvm` 2026.1.0 (`/usr/local/bin/scummvm` lacks libtheoradec) and the

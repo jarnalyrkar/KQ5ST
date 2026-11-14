@@ -179,8 +179,12 @@ static void display_open(struct BitMap *bm) {
         memset(st_screen, 0, 32000);
         memset(st_palette, 0, sizeof st_palette);
         for (int i = 1; i < 4; i++) st_palette[i] = 0xfff;
-        Supexec(set_palette_hw);
+        /* TOS 4.0x (Falcon) Setscreen queues its default palette through colorptr ($45a) for
+         * the next VBL; set ours after that VBL or the default overwrites the game's palette
+         * (the game loads its fixed EGA palette only once). */
         Setscreen((long)st_screen, (long)st_screen, 0);
+        Vsync();
+        Supexec(set_palette_hw);
     }
     shown = bm;
     dbg("display: bitmap %dx%d depth %d, planes $%x $%x ... (stride %d)\n", bm->bytesperrow * 8, bm->rows, bm->depth,
@@ -298,6 +302,7 @@ void display_init(void) {
 void display_restore(void) {
     if (!st_screen) return;
     for (int i = 0; i < 16; i++) st_palette[i] = old_palette[i];
-    Supexec(set_palette_hw);
     Setscreen((long)old_phys, (long)old_phys, old_rez);
+    Vsync();                        /* let a queued TOS palette land first (see display_open) */
+    Supexec(set_palette_hw);
 }

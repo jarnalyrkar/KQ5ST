@@ -16,6 +16,15 @@
 | current script's code across such calls, as Prog does, since a script can move while one runs.
 | Locals/temps/params/rest stay in the globals (they change per call frame and hunk 23 uses them).
 | d4-d6 are untouched; d7/a3/a5 are saved and restored around the external entry.
+|
+| Assembled twice: as is, and with -DPM_SAFE into pm_entry_safe, whose FETCHW has no movep. The
+| 68060 traps movep (unimplemented integer instruction) and leaves it to a support package that is
+| slow or may be missing; shim.c points the Prog entry at the safe copy when _CPU says 68060.
+| The selector-table cache (tabfind and its tables) exists only in the main copy.
+
+#ifdef PM_SAFE
+#define pm_entry pm_entry_safe
+#endif
 
 	.set	ACC,       -0x7134
 	.set	CALLKPC,   -0x7144	| PC at the last callk operand (Prog debug aid)
@@ -50,11 +59,20 @@
 	moveq	#0,\reg
 	move.b	(%a0)+,\reg
 	.endm
+#ifndef PM_SAFE
 	.macro	FETCHW reg		| little-endian word operand (any alignment)
 	movep.w	1(%a0),\reg
 	move.b	(%a0)+,\reg
 	addq.l	#1,%a0
 	.endm
+#else
+	.macro	FETCHW reg		| same without movep (68060: no movep in hardware; see header)
+	move.b	1(%a0),\reg
+	lsl.w	#8,\reg
+	move.b	(%a0),\reg
+	addq.l	#2,%a0
+	.endm
+#endif
 	.macro	SYNC_OUT		| before calling out of the loop
 	move.w	%d7,ACC(%a4)
 	.endm
@@ -1073,6 +1091,8 @@ pm_loadclass:
 | even after scripts were unloaded and others loaded there. Caches "absent" too.
 | tabfind: a1 = table (selector words), d2.w = count (> 0), d4.w = selector -> d3.w = index or -1.
 | Word operations only on d3 (its upper half is kept); preserves everything else.
+| shared by both copies: only in the main one
+#ifndef PM_SAFE
 	.globl	tabfind, tabcache, propcache
 tabfind:
 	cmp.w	#8,%d2				| short table: a plain scan is cheaper than the cache
@@ -1150,6 +1170,7 @@ tabfind:
 tabcache:	.space	512*16		| tabfind: 512 entries of 16 bytes
 propcache:	.space	512		| index hints: cached index * 2 by (list ^ selector)
 	.text
+#endif
 
 | ---- errors: PError(pc, stack, code, ...) in hunk 61 prints a box and exits -------------
 pm_err_class:				| 3: class not loaded; a1 = table entry

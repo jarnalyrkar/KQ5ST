@@ -276,3 +276,83 @@ Blitmode: ENTER				| (mode) XBIOS 64
 	addq.l	#4,%sp
 	ext.l	%d0
 	LEAVE
+
+| ---- CPU cache flush (supervisor; run through Supexec). Code the shim writes at run time (the
+| library jump tables, the 68060 interpreter entry) must reach memory before it is executed: the
+| 68040/68060 data cache is copyback and the instruction cache does not see it. Encoded as words
+| because the file is assembled for the 68000.
+	.globl	cache_flush_040
+cache_flush_040:			| 68040/68060: cpusha bc (push + invalidate both caches)
+	.word	0xf4f8
+	moveq	#0,%d0
+	rts
+	.globl	cache_flush_030
+cache_flush_030:			| 68020/68030: set CD + CI in CACR (clear data + instruction cache)
+	move.l	%d1,-(%sp)
+	.word	0x4e7a,0x1002		| movec cacr,d1
+	or.w	#0x0808,%d1
+	.word	0x4e7b,0x1002		| movec d1,cacr
+	move.l	(%sp)+,%d1
+	moveq	#0,%d0
+	rts
+
+| ---- 68060: movep emulation (vector 61, unimplemented integer instruction) ------------------
+| The 68060 has no movep in hardware and Prog uses it all over (SCI reads little-endian words with
+| "movep.w 1(an),dn; move.b (an),dn": send, resource loader, graphics). Normally the 060 support
+| package in TOS/MiNT emulates it; this handler does it without one. Other unimplemented integer
+| instructions (64-bit mul/div, cas2, chk2, cmp2), and movep through a7, go to the previous
+| handler. Installed by shim.c only when _CPU = 60. Frame (format 0): sr.w, pc.l (= the movep).
+| movep: 0000 ddd1 oo00 1aaa disp16, oo: 00 word to reg, 01 long to reg, 10 word to mem, 11 long
+| to mem (bit 8 set with mode 001 is no other instruction).
+	.globl	movep_handler, movep_old
+movep_handler:
+	movem.l	%d0-%d7/%a0-%a6,-(%sp)	| d n at 4n(sp), a n at 32+4n(sp); frame at 60(sp)
+	move.l	62(%sp),%a0		| pc
+	move.w	(%a0),%d0
+	move.w	%d0,%d1
+	and.w	#0xf138,%d1
+	cmp.w	#0x0108,%d1
+	bne.s	9f
+	moveq	#7,%d1
+	and.w	%d0,%d1
+	cmp.w	#7,%d1
+	beq.s	9f
+	lsl.w	#2,%d1
+	move.l	32(%sp,%d1.w),%a1	| an
+	adda.w	2(%a0),%a1		| + displacement
+	move.w	%d0,%d1
+	lsr.w	#7,%d1
+	and.w	#0x1c,%d1
+	lea	(%sp,%d1.w),%a2		| saved dn (big-endian long)
+	btst	#7,%d0
+	bne.s	3f
+	btst	#6,%d0
+	bne.s	2f
+	move.b	(%a1),2(%a2)		| word to register
+	move.b	2(%a1),3(%a2)
+	bra.s	8f
+2:	move.b	(%a1),(%a2)		| long to register
+	move.b	2(%a1),1(%a2)
+	move.b	4(%a1),2(%a2)
+	move.b	6(%a1),3(%a2)
+	bra.s	8f
+3:	btst	#6,%d0
+	bne.s	4f
+	move.b	2(%a2),(%a1)		| word to memory
+	move.b	3(%a2),2(%a1)
+	bra.s	8f
+4:	move.b	(%a2),(%a1)		| long to memory
+	move.b	1(%a2),2(%a1)
+	move.b	2(%a2),4(%a1)
+	move.b	3(%a2),6(%a1)
+8:	addq.l	#4,62(%sp)		| past the movep
+	movem.l	(%sp)+,%d0-%d7/%a0-%a6
+	rte
+9:	movem.l	(%sp)+,%d0-%d7/%a0-%a6
+	move.l	movep_old,-(%sp)	| not ours: the previous handler, frame untouched
+	rts
+
+	.data
+	.balign	2
+movep_old:	.long	0
+	.text

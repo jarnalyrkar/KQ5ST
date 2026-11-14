@@ -21,4 +21,6 @@ m68k-linux-gnu-objcopy -O binary $T/tab.elf $T/tab.bin
 python3 tools/equiv/sendtest.py $T/tab.bin $(m68k-linux-gnu-nm $T/tab.elf | awk '/hook_proplookup/{print $1}') ${2:-20000}
 # the rewritten bytecode interpreter and send (st/src/pmachine.S) against Prog's hunks 4 and 23
 python3 tools/equiv/pmtest.py $(tools/equiv/pmbuild.sh $T/pm) ${3:-150} 1
+# ... and its movep-free copy for the 68060 (-DPM_SAFE)
+python3 tools/equiv/pmtest.py $(tools/equiv/pmbuild.sh $T/pms safe) ${3:-150} 1
 rm -rf $T

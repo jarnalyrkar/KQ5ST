@@ -224,6 +224,31 @@ static u32 the_lock;
 
 struct LoaderMsg *loader_msg;
 
+/* ---- CPU type (Falcon/TT accelerators) ------------------------------------------------------ */
+static long cpu_type;               /* _CPU cookie: 0, 10, 20, 30, 40, 60 (0 without a cookie jar) */
+static long read_cpu_cookie(void) {
+    const u32 *jar = *(const u32 **)0x5a0;
+    if (jar) for (; jar[0]; jar += 2) if (jar[0] == 0x5f435055) { cpu_type = jar[1]; break; }   /* '_CPU' */
+    return 0;
+}
+long cache_flush_040(void), cache_flush_030(void);
+static void flush_caches(void) {    /* after writing code: see gemdos.S */
+    if (cpu_type >= 40) Supexec(cache_flush_040);
+    else if (cpu_type >= 20) Supexec(cache_flush_030);
+}
+/* The 68060 has no movep in hardware (it traps to a support package, which may be slow or
+ * missing): run the bytecode interpreter copy without it (pmachine.S, PM_SAFE). */
+static void select_interpreter(void) {
+    extern char hunk4[], pm_entry[], pm_entry_safe[];
+    u8 *p = (u8 *)hunk4 + 0x402;    /* prog.patch: "jmp pm_entry" */
+    if (cpu_type < 60) return;
+    if (*(u16 *)p != 0x4ef9 || *(u32 *)(p + 2) != (u32)pm_entry) fatal("interpreter entry not found");
+    *(u32 *)(p + 2) = (u32)pm_entry_safe;
+    dbg("68060: interpreter without movep\n");
+}
+/* ... and Prog's own movep (dozens of sites) is emulated by movep_handler (gemdos.S). */
+extern char movep_handler[]; extern long movep_old;
+
 int shim_main(void *bp) {
     (void)bp;
     extern char nf_illegal[];
@@ -256,6 +281,11 @@ int shim_main(void *bp) {
     loader_msg->heap_n = 0x36da6;
     loader_msg->heap = mem_alloc(loader_msg->heap_n, 1);
 
+    Supexec(read_cpu_cookie);
+    dbg("CPU: 680%02d\n", (int)cpu_type);
+    select_interpreter();
+    if (cpu_type >= 60) movep_old = Setexc(61, movep_handler);
+    flush_caches();                 /* library jump tables and the interpreter entry */
     long rc = run_prog(hunk0, prog_stack + sizeof prog_stack, sizeof prog_stack - 8);
     dbg("Prog returned %d\n", rc);
     /* Back to the desktop: undo everything that points into this program or changed the
@@ -266,6 +296,7 @@ int shim_main(void *bp) {
     display_restore();
     for (int i = 0; i < 9; i++) Setexc(vecs[i], (void *)old_vecs[i]);
     Setexc(32 + 5, (void *)old_vecs[9]);
+    if (movep_old) Setexc(61, (void *)movep_old);
     nf_exit(rc);
     return rc;
 }

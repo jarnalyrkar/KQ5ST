@@ -43,3 +43,7 @@
 36  2dbc  4e55fff8206d   JMP:hook_ptdist2
 # Speed: cel drawing opaque runs -> one inline loop per colour (no per-pixel jsr), glue.S
 56  578   d040d0404dec   JMP:hook_celrun
+# 68060: no movep in hardware (it traps to a support package, crashing without one). Decompression
+# loop: "addq.w #1,a6; movep.w -1(a6),d0; move.b (a6),d0" -> "move.b (a6)+,d0; lsl.w #8,d0;
+# move.b (a6),d0; nop" (same d0.w = a6[0]<<8 | a6[1] and a6 + 1; nothing branches inside).
+49  192   524e010effff1016   101ee14810164e71

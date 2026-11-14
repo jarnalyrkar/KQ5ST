@@ -27,3 +27,8 @@ port/tools/mt32bridge/build/
 port/tools/mt32bridge/mt32bridge
 port/st/munt.fifo
 port/st/munt.log
+
+# TOS ROM images (copyrighted) must never be committed, wherever they are put
+tos*.zip
+tos*.img
+*.rom

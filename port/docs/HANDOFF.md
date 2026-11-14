@@ -171,6 +171,40 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
     no such bug (it disposes itself in state 12).
 - No shim code changed; `KQ5ST.PRG` is the v0.2.1 binary.
 
+## Work of 2026-11-14: Falcon / CT60 (unreleased)
+
+- **Player report** on v0.2.2 from a Falcon + CT60 owner (VGA, 14 MB ST-RAM, 512 MB fast RAM):
+  colours totally wrong under TOS in both 030 and 060 mode; a crash just before the intro under
+  EasyMiNT/FreeMiNT in 060 mode.
+- **Testing a Falcon in Hatari** (2026-11-14, `--machine falcon --monitor vga --memsize 14`; for
+  the 060 add `--cpulevel 6 --fpu internal --ttram 512 --addr24 off`): EmuTOS 512k reproduces
+  neither problem. TOS 4.04 (the user's image, kept out of git) reproduces both. The Falcon boot
+  video mode is the VsetMode word at offset 14 of `hatari.nvram`, so to boot the desktop in
+  16-colour, 256-colour or true-colour modes, change it and fix the checksum at 48/49.
+- **Palette fixed** (`display.c`): TOS 4.0x `Setscreen` queues its default palette through
+  `colorptr` (`$45a`) for the next VBL. That overwrote the fixed EGA palette, which the game
+  loads only once, right after opening the screen. Now: `Setscreen`, then `Vsync`, then the
+  palette, both on entry and on exit.
+- **68060** (one program for all machines; the shim reads the `_CPU` cookie): the 060 has no
+  `movep` in hardware, and Prog uses it at dozens of sites (SCI reads little-endian words with
+  `movep.w 1(an),dn; move.b (an),dn`: send in hunk 23, the resource loader in hunk 49, graphics
+  in hunk 55). Without an 060 support package each one goes to TOS's handler and the game dies.
+  - `movep_handler` (`gemdos.S`, vector 61, installed on the 060 only) emulates `movep` and
+    passes any other unimplemented integer instruction to the previous handler.
+  - The interpreter's `FETCHW` (hot path) gets a second, `movep`-free copy of `pmachine.S`
+    (`-DPM_SAFE`, `pm_entry_safe`). `select_interpreter` points the hunk 4 `+$402` jump at it.
+    Both copies pass `pmtest.py` (900 worlds, 0 mismatches); `tools/equiv/run.sh` tests both.
+  - `prog.patch`: H49 `+$192` decompression loop rewritten without `movep` (hot, saves traps).
+- **Cache flush** (`flush_caches`, `gemdos.S` `cache_flush_040/030`): the library jump tables
+  (`make_library`/`set_lvo`) and the interpreter entry are code written at run time. On a
+  040/060 with a copyback data cache (CT60) they must be pushed before use; this was never done
+  before. Hatari does not model it, so this is an untested, possible cause of the reported MiNT
+  crash.
+- **Verified headless**: TOS 4.04 030 (three desktop modes) and 060, and EmuTOS 060: correct
+  colours up to the cartoon warning. 060 + TOS 4.04: `walk_shots` reaches room 1 and Graham
+  walks. STE TOS 1.62 unchanged. **Not run under MiNT and not on real hardware**; the reporting
+  player should try a test build.
+
 ## Known gaps / risks
 
 0. Start-up from a real hard disk was slow (~94 s black screen in Hatari's ACSI emulation);

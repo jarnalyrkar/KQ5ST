@@ -217,7 +217,7 @@ makes `c_LoadSeg` (dos.c) return `mt32_seg` instead of the YM driver (`NOSND` st
   waits transmit time + 40 ms for rev 0), and from inside the tick (reverb changes) the VBL wait
   could not see the VBL (IPL 4 under the tick's IPL 5) and spun to its timeout. Fixed as above;
   capture check: same memory image (all regions contiguous, right sizes, checksums right).
-  **Awaiting the player's re-test.** If the overflow persists: raise the pause / lower
+  **Confirmed by the player on v0.2.3 (2026-11-15): "sounds right now"** (instruments and volume). If an overflow ever returns: raise the pause / lower
   `SYSEX_CHUNK` in `mt32.c`.
 - Events: NoteOn/NoteOff as is (the interpreter ends notes with velocity-0 note-ons); volume
   (controller 7) is scaled by the game's master volume 0-15 and resent when the master volume

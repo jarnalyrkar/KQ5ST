@@ -102,7 +102,7 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
   `play.sh --mt32 DEVICE` sends the MIDI to a real port.
   **2026-11-15, first real MT-32 test (a player):** "Exc. Buffer overflow" at start-up, wrong
   instruments until the MT-32 was reset. SysEx now split to <=128 bytes with 50+ ms pauses on
-  `_hz_200` (SOUND.md); start-up upload ~13 s. Released in v0.2.3 (with the Falcon/CT60 fixes); awaiting re-test.
+  `_hz_200` (SOUND.md); start-up upload ~13 s. Released in v0.2.3 (with the Falcon/CT60 fixes); **the player confirmed it sounds right** (2026-11-15), a video to follow.
 - **Music tempo** (SOUND.md "Tick rate"): the SCI tick runs at 59.94 Hz on MFP Timer B instead of
   the 50 Hz VBL; music and timed waits were 17 % slow (the user noticed with the MT-32).
   Verified: 599 ticks per 500 VBLs, Quit to a stable desktop with `--natfeats no`.

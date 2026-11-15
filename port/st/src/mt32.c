@@ -6,7 +6,7 @@
  *
  * Init uploads patch 1 (Sierra's MT-32 set-up: display texts, patch memory, 64 timbres, rhythm
  * key map, partial reserve) as Roland SysEx, following ScummVM's MidiPlayer_Midi::readMt32Patch
- * for SCI1. That takes ~17 KB at 31250 baud plus a pause after each message (~6-8 s once, at
+ * for SCI1. That takes ~17 KB at 31250 baud plus a pause after each message (~12 s once, at
  * start-up, with "<--Sierra On-Line-->" on the MT-32 display).
  *
  * Output is written straight to the ACIA (busy-wait on TDRE, 320 us per byte) with running
@@ -20,8 +20,6 @@
 
 #define ACIA_CTRL (*(volatile u8 *)0xfffffc04)
 #define ACIA_DATA (*(volatile u8 *)0xfffffc06)
-
-extern volatile u32 vbl_count;
 
 static u8 ch_prog[NCH], ch_vol[NCH], ch_hold[NCH], ch_voices[NCH];
 static u16 ch_bend[NCH];
@@ -41,12 +39,29 @@ static void midi_msg(u8 status, u8 d1, u8 d2, int len) {
     if (len > 2) midi_byte(d2 & 0x7f);
 }
 
-static void wait_vbls(int n) {                       /* n VBL boundaries: (n-1)*20 to n*20 ms */
-    for (int i = 0; i < n; i++) { u32 v = vbl_count; for (u32 t = 0; vbl_count == v && t < 2000000; t++) ; }
+/* Pauses use TOS's 200 Hz counter _hz_200 ($4ba, MFP Timer C at IPL 6): it keeps counting while
+ * we run inside the SCI tick (IPL 5), which holds off the VBL (IPL 4) - the old VBL-count wait
+ * spun to its timeout there - and gives 5 ms steps instead of 20. */
+#define HZ200 (*(volatile u32 *)0x4ba)
+static void wait_ms(int ms) {
+    u32 t0 = HZ200, n = ms / 5 + 1;                  /* +1: the first step may come at once */
+    for (u32 t = 0; HZ200 - t0 < n && t < 4000000; t++) ;
 }
 
-/* Roland DT1 to the MT-32 (model $16, device $10): F0 41 10 16 12 addr(3) data checksum F7 */
-static void sysex(u32 addr, const u8 *data, int len) {
+/* Roland DT1 to the MT-32 (model $16, device $10): F0 41 10 16 12 addr(3) data checksum F7.
+ * Real MT-32s (rev 0 ROMs above all) show "Exc. Buffer overflow" and drop data if SysEx comes in
+ * faster than they digest it (player report 2026-11-15: the overflow message at start-up, wrong
+ * instruments until the MT-32 was power-cycled). Sierra's drivers and ScummVM pause after each
+ * message (ScummVM: transmit time + 40 ms for rev 0; we had 20-40 ms). So: at most SYSEX_CHUNK
+ * data bytes per message (addresses are 7-bit per byte, so the next chunk's address carries at
+ * 128), then a pause of 50 ms plus 1 ms per 8 bytes. Munt does not care either way. */
+#define SYSEX_CHUNK 128
+static u32 addr_add(u32 a, int n) {                  /* add n to a 3x7-bit Roland address */
+    u32 lin = ((a >> 16 & 0x7f) << 14 | (a >> 8 & 0x7f) << 7 | (a & 0x7f)) + n;
+    return (lin >> 14 & 0x7f) << 16 | (lin >> 7 & 0x7f) << 8 | (lin & 0x7f);
+}
+
+static void sysex1(u32 addr, const u8 *data, int len) {
     u8 a[3] = { addr >> 16, addr >> 8, addr };
     u8 sum = 0;
     running = 0;
@@ -55,7 +70,15 @@ static void sysex(u32 addr, const u8 *data, int len) {
     for (int i = 0; i < len; i++) { midi_byte(data[i] & 0x7f); sum += data[i] & 0x7f; }
     midi_byte((128 - (sum & 127)) & 127);
     midi_byte(0xf7);
-    wait_vbls(2);                                    /* the MT-32 (rev 0) needs a pause after SysEx */
+    wait_ms(50 + len / 8);
+}
+
+static void sysex(u32 addr, const u8 *data, int len) {
+    while (len > 0) {
+        int n = len > SYSEX_CHUNK ? SYSEX_CHUNK : len;
+        sysex1(addr, data, n);
+        addr = addr_add(addr, n); data += n; len -= n;
+    }
 }
 
 static void send_volume(int ch) {

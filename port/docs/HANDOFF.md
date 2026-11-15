@@ -100,6 +100,9 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
   and bee-hive silence (fixed, verified by MIDI capture from restored saves; **user to
   re-listen**). Not tried on real hardware: the user's D-50 is not MT-32 compatible.
   `play.sh --mt32 DEVICE` sends the MIDI to a real port.
+  **2026-11-15, first real MT-32 test (a player):** "Exc. Buffer overflow" at start-up, wrong
+  instruments until the MT-32 was reset. SysEx now split to <=128 bytes with 50+ ms pauses on
+  `_hz_200` (SOUND.md); start-up upload ~13 s. Released in v0.2.3 (with the Falcon/CT60 fixes); awaiting re-test.
 - **Music tempo** (SOUND.md "Tick rate"): the SCI tick runs at 59.94 Hz on MFP Timer B instead of
   the 50 Hz VBL; music and timed waits were 17 % slow (the user noticed with the MT-32).
   Verified: 599 ticks per 500 VBLs, Quit to a stable desktop with `--natfeats no`.
@@ -171,7 +174,7 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
     no such bug (it disposes itself in state 12).
 - No shim code changed; `KQ5ST.PRG` is the v0.2.1 binary.
 
-## Work of 2026-11-14: Falcon / CT60 (unreleased)
+## Work of 2026-11-14: Falcon / CT60 (released in v0.2.3)
 
 - **Player report** on v0.2.2 from a Falcon + CT60 owner (VGA, 14 MB ST-RAM, 512 MB fast RAM):
   colours totally wrong under TOS in both 030 and 060 mode; a crash just before the intro under

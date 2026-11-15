@@ -46,7 +46,7 @@ the music on a Roland MT-32 (or CM-32L / CM-64, or the Munt emulator)
 connected to the ST's MIDI OUT, instead of the YM chip. The YM chip is then
 silent. Delete the file to go back.
 At start-up the game sends Sierra's instrument set to the module (about
-6-8 seconds; the MT-32 display shows "KINGS QUEST V"). General MIDI and
+15 seconds; the MT-32 display shows "KINGS QUEST V"). General MIDI and
 other synths (D-50, etc.) are not supported: the music is written for the
 MT-32's own sounds and drum kit.
 

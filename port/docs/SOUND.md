@@ -206,8 +206,19 @@ makes `c_LoadSeg` (dos.c) return `mt32_seg` instead of the YM driver (`NOSND` st
   `05 00 00`, 64 timbres to `08 00 00` + i*`02 00`, `$ABCD` + patches 49-96 to `05 03 00`,
   `$DCBA` + rhythm key map to `03 01 10` and partial reserve to `10 00 04`, after-text, the
   6-byte "mystery" message to `52 00 0a`, then reverb config `data[62]` to `10 00 01` and master
-  volume 100 to `10 00 16`. 73 messages, ~17 KB, a 2-VBL pause after each (MT-32 rev 0 needs
-  one): about 6-8 s at start-up. Terminate sends the goodbye text (`data[40..59]`).
+  volume 100 to `10 00 16`. ~17 KB, split into messages of at most 128 data bytes (7-bit address
+  carry, `addr_add`): 142 messages, each followed by a pause of 50 ms + 1 ms per 8 bytes timed on
+  `_hz_200` (`$4ba`, Timer C, runs at IPL 6 even inside the SCI tick): about 13 s at start-up.
+  Terminate sends the goodbye text (`data[40..59]`).
+- **First real MT-32 report (2026-11-15, a player with a real MT-32):** "Exc. Buffer overflow"
+  right after the "KINGS QUEST V" text; Sierra-logo low triplets wrong sound and pitch; village
+  music with wrong instruments, correct after power-cycling the MT-32 in the village. All fit a
+  garbled upload: the old pause was 2 VBLs = 20-40 ms after up-to-384-byte messages (ScummVM
+  waits transmit time + 40 ms for rev 0), and from inside the tick (reverb changes) the VBL wait
+  could not see the VBL (IPL 4 under the tick's IPL 5) and spun to its timeout. Fixed as above;
+  capture check: same memory image (all regions contiguous, right sizes, checksums right).
+  **Awaiting the player's re-test.** If the overflow persists: raise the pause / lower
+  `SYSEX_CHUNK` in `mt32.c`.
 - Events: NoteOn/NoteOff as is (the interpreter ends notes with velocity-0 note-ons); volume
   (controller 7) is scaled by the game's master volume 0-15 and resent when the master volume
   or sound on/off changes; controllers 1, 10, 11, `$40`, `$79`, `$7b` pass through, `$4b` (SCI
@@ -218,7 +229,7 @@ makes `c_LoadSeg` (dos.c) return `mt32_seg` instead of the YM driver (`NOSND` st
   open its default MIDI input and disables MIDI): 73 SysEx messages, all checksums right, display
   texts correct; the fanfare and title music go out on channels 1-9 with program changes, note-ons
   and note-offs balance (400/400). The game runs on with `--natfeats no`. Check a capture with
-  `tools/midicheck.py FILE`. **Not yet heard** on a real MT-32 or Munt (no MT-32 ROMs here).
+  `tools/midicheck.py FILE`. Heard through Munt (user) and on a real MT-32 (player, see below).
 - Not supported: GM modules (would need ScummVM's MT-32→GM map; KQ5 has no GM tracks) and
   non-multitimbral synths such as the D-50.
 

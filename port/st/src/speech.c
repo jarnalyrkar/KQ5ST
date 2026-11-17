@@ -3,7 +3,9 @@
  * SPEECH.DAT (tools/makespeech.py) holds the CD clips of the text lines that have one, keyed by
  * text (module, index), as signed 8-bit mono at 12517 Hz. The patched scripts (makescr.py,
  * PrintDC in script 759 and the talker procedure proc0_28 in script 0) call
- *   (DoAudio 2 module index)  -> starts the clip, returns its length in ticks (0 = none)
+ *   (DoAudio 2 module index)  -> starts the clip, returns its length in ticks (0 = none);
+ *                                module >= 1000 is a string (near pointer), looked up by an
+ *                                FNV-1a hash of its text (makespeech.py str_key)
  *   (DoAudio 3)               -> stops it (when the text box closes)
  * which replaces Prog's own DoAudio (kernel 117, a no-op without audio hardware). Every other
  * call keeps the old behaviour (nothing happens, acc unchanged), except Position while one of our
@@ -73,7 +75,7 @@ static u32 dma_pos(void) {          /* bytes played */
 }
 
 /* Runs in supervisor mode (Prog does). args: argc, sub-function, ... */
-void c_doaudio(const s16 *args, s16 *acc) {
+void c_doaudio(const s16 *args, s16 *acc, const u8 *heap) {
     int argc = args[0], fn = argc ? args[1] : 0;
     if (fh < 0) return;
     switch (fn) {
@@ -81,7 +83,13 @@ void c_doaudio(const s16 *args, s16 *acc) {
         if (argc != 3) return;      /* a CD clip number: not ours */
         SND(0x01) = 0; active = 0;
         {
-            const struct line *l = find(args[2], args[3]);
+            int module = (u16)args[2], index = args[3];
+            if (module >= 1000) {   /* a string (near pointer): look it up by its text */
+                const u8 *t = heap + (u16)module; u32 h = 0x811c9dc5;
+                while (*t) h = (h ^ *t++) * 0x01000193;
+                module = 0xf000 | (h >> 16 & 0xfff); index = (u16)h;
+            }
+            const struct line *l = find(module, index);
             if (!l || Fseek(l->offset, fh, 0) != (long)l->offset || Fread(fh, l->length, buf) != (long)l->length) {
                 *acc = 0; return;
             }
@@ -91,7 +99,7 @@ void c_doaudio(const s16 *args, s16 *acc) {
             SND(0x21) = 0x81;       /* mono, 12517 Hz */
             SND(0x01) = 1;          /* play once */
             active = 1; cur_len = l->length;
-            dbg("speech: line %d %d, %d bytes\n", args[2], args[3], (int)cur_len);
+            dbg("speech: line %d %d, %d bytes\n", module, index, (int)cur_len);
             *acc = cur_len * 60 / RATE + 1;
         }
         return;

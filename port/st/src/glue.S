@@ -715,9 +715,10 @@ stack_top:
 	.globl	k_doaudio
 k_doaudio:
 	movem.l	%d2-%d7/%a2-%a6,-(%sp)
+	move.l	-0x5912(%a4),-(%sp)	| heap base (SCI near pointers: strings)
 	pea	-0x7134(%a4)
-	move.l	4+44+4(%sp),-(%sp)
+	move.l	4+44+8(%sp),-(%sp)
 	jsr	c_doaudio
-	addq.l	#8,%sp
+	lea	12(%sp),%sp
 	movem.l	(%sp)+,%d2-%d7/%a2-%a6
 	rts

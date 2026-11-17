@@ -9,21 +9,58 @@ STE DMA rate 12517 Hz and stored signed.
 
 SPEECH.DAT, big-endian:  'KQSP', u16 count, u16 rate code (1 = 12517 Hz), u32 largest clip,
 then count entries (u16 module, u16 index, u32 offset from file start, u32 length; sorted by
-module, index), then the samples (each clip at an even offset, even length)."""
+module, index; a literal string has a hashed key, see str_key), then the samples (each clip at an even offset, even length)."""
 import sys, os, struct
 import numpy as np
 
 RATE_IN, RATE_OUT = 11025, 12517
 
-# (text module, text index, CD clip)
+# (text module, text index, CD clip). Matched by hand from the sluicebox CD and Amiga scripts
+# (same code order; SOUND.md "Speech").
 LINES = [
-    # Room 1, outside Crispin's house (rm001)
+    # Room 1, outside Crispin's house (rm001): narrator Look/Do lines
     (1, 0, 162), (1, 1, 9070), (1, 2, 163), (1, 3, 171), (1, 4, 164), (1, 5, 165),
     (1, 6, 166), (1, 7, 167), (1, 9, 168), (1, 10, 169), (1, 12, 170),
+    # rm001 Cedric: Do on the ornament, Look at the cellar door (CD proc762_1 3021, 3022)
+    (1, 8, 3021), (1, 11, 3022),
     # rm001 introRoomScript: Cedric (view 75) and Graham (160) after the intro (CD: Talker
     # conversation local173 = Cedric 9106, Graham 7040, Cedric 9107, Graham 7041)
     (1, 13, 9106), (1, 14, 7040), (1, 15, 9107), (1, 16, 7041),
+    # Main (script 0, every room): cartoon captions 0-1, inventory used on Graham 2-21 (CD Say
+    # 136-155), Cedric hurt / talking to yourself 22-24, waving the wands 27-29. 25-26 are the
+    # Quit/debug dialogs.
+    (0, 0, 82), (0, 1, 83),
+] + [(0, i, 134 + i) for i in range(2, 22)] + [
+    (0, 22, 157), (0, 23, 158), (0, 24, 130), (0, 27, 134), (0, 28, 135), (0, 29, 156),
+    # KQInv (every room): text 758 (pouch, sack, amulet, wands; 2 is a formatted pouch line,
+    # not covered) ...
+    (758, 0, 96), (758, 1, 100), (758, 3, 132), (758, 4, 115), (758, 5, 119), (758, 6, 121),
+    (758, 7, 128),
+] + [
+    # ... and text 749 = the items' `description` (Look), joined by item name with the CD's
+    (749, a, c) for a, c in [(1, 84), (2, 85), (3, 86), (4, 87), (5, 88), (6, 89), (7, 90), (8, 91),
+        (9, 92), (10, 93), (11, 94), (12, 95), (15, 104), (16, 105), (17, 106), (18, 107), (20, 110),
+        (21, 111), (22, 112), (23, 113), (24, 114), (25, 116), (26, 117), (27, 118), (28, 120),
+        (29, 122), (30, 123), (31, 124), (32, 692), (33, 125), (34, 126), (35, 127), (36, 129),
+        (37, 88)]
+] + [
+    # owl region (script 202, the forest rooms with Cedric): inventory on Cedric, "not listening"
+    (202, 0, 3019), (202, 1, 75), (202, 2, 76), (202, 3, 77), (202, 4, 78),
+] + [(600, i, c) for i, c in enumerate(          # Look at Cedric, per room (CD local52)
+    [57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 66, 67, 68, 69, 70, 71, 72, 73, 74])
+] + [(602, i, 3005 + i) for i in range(14)]      # Talk to Cedric, per room (CD local71)
+
+# Literal strings in the Amiga scripts (not text resources) that the CD speaks: matched by a
+# hash of the exact bytes (speech.c str_key). (text, CD clip)
+STRINGS = [
+    (b'"Come ON, Graham! There\'s nothing here. Let\'s go!"', 3020),   # rm001 global325 (owl nag)
 ]
+
+def str_key(b):
+    """FNV-1a 32 of the string -> (module, index) with module >= $f000 (text modules are < 1000)."""
+    h = 0x811c9dc5
+    for c in b: h = ((h ^ c) * 0x01000193) & 0xffffffff
+    return 0xf000 | (h >> 16) & 0xfff, h & 0xffff
 
 def read_map(cd):
     d = open(os.path.join(cd, 'AUDIO001.MAP'), 'rb').read()
@@ -52,7 +89,9 @@ def main():
     cd, out = sys.argv[1], sys.argv[2]
     amap = read_map(cd)
     clips = {}
-    for mod, idx, n in LINES:
+    entries = LINES + [str_key(t) + (n,) for t, n in STRINGS]
+    assert len({(m, i) for m, i, n in entries}) == len(entries), 'duplicate key'
+    for mod, idx, n in entries:
         if n in clips: continue
         vol, off, sz = amap[n]
         with open(os.path.join(cd, 'AUDIO001.%03d' % vol), 'rb') as f:
@@ -60,7 +99,7 @@ def main():
         s = resample(raw).tobytes()
         if len(s) & 1: s += b'\0'
         clips[n] = s
-    lines = sorted(LINES)
+    lines = sorted(entries)
     head = 12 + 12 * len(lines)
     blobs, where, pos = [], {}, head
     for n, s in clips.items():

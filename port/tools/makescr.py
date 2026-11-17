@@ -20,6 +20,7 @@ RES = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'extracted'
 # ---- SCI bytecode helpers (word forms where an operand is a word, byte forms otherwise) ---------
 def jmp(off):  return b'\x32' + struct.pack('<h', off)
 def bnt(off):  return b'\x30' + struct.pack('<h', off)
+def bt(off):   return b'\x2e' + struct.pack('<h', off)
 def ldi(v):    return b'\x34' + struct.pack('<H', v & 0xffff)
 def pushi(v):  return b'\x38' + struct.pack('<H', v)
 PUSH0, PUSH, AND = b'\x76', b'\x36', b'\x12'
@@ -172,11 +173,12 @@ HOOKS = [
 
 # ---- Speech (SOUND.md "Speech", st/src/speech.c) -----------------------------------------------
 # The text procedures start the line's CD clip and stop it when the text box closes:
-#   start (replaces the procedure's `link`): if (u< param[MOD] 1000):
-#     temp0 = (DoAudio 2 param[MOD] param[IDX])  ; clip length in ticks, 0 = no clip
+#   start (replaces the procedure's `link`):
+#     temp0 = (DoAudio 2 param[MOD] param[IDX])  ; clip length in ticks, 0 = no clip; MOD >= 1000
+#                                                ; is a string (speech.c hashes its text)
 #     if temp0: temp0 = temp0/60 + 2 (seconds) and every `#time n` (25 n) among the params from
-#       FIRST on gets n = max(n, temp0), so a timed box stays up while the line is spoken
-#   else temp0 = 0
+#       FIRST on (FIRST-1 for a string, whose Print parameters start right after it) gets
+#       n = max(n, temp0), so a timed box stays up while the line is spoken
 #   stop (every exit path jumps here): if temp0 (DoAudio 3); acc is kept (in temp1, which both
 #   procedures only use before their Print returns).
 K_DoAudio = 117
@@ -197,10 +199,11 @@ def speech_patch(d, start, mod_p, idx_p, first, tails, retargets):
     callk = lambda k, n: b'\x43' + bytes([k, n])
     ULT, DIV, ADD = b'\x2a', b'\x08', b'\x02'
     t += replaced
-    t += lsp(mod_p) + ldi(1000) + ULT;                                    br(bnt, 'notext')
     t += pushi(3) + pushi(2) + lsp(mod_p) + lsp(idx_p) + callk(K_DoAudio, 6) + sat(0); br(bnt, 'back')
     t += lst(0) + ldi(60) + DIV + PUSH + ldi(2) + ADD + sat(0)
     t += ldi(first) + sat(1)
+    t += lsp(mod_p) + ldi(1000) + ULT;                                    br(bt, 'loop')
+    t += dec_at(1)                          # a string: the Print parameters start one earlier
     lab('loop')
     t += lst(1) + lap(0) + LT;                                            br(bnt, 'back')
     t += lat(1) + lapi(0) + PUSH + ldi(25) + EQ;                          br(bnt, 'next')
@@ -208,8 +211,6 @@ def speech_patch(d, start, mod_p, idx_p, first, tails, retargets):
     t += lst(0) + lat(1) + sapi(1)
     lab('next')
     t += inc_at(1);                                                       br(jmp, 'loop')
-    lab('notext')
-    t += ldi(0) + sat(0)
     lab('back')
     fix.append((len(t) + 1, ('abs', start + 3))); t += jmp(0)
     lab('stop')

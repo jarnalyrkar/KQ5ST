@@ -216,7 +216,7 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
   (GRAPHICS.md "Fourth player report"). Verified as a cel sheet and in a headless run of the
   scene. Built as v0.2.4 (`dist/KQ5ST-v0.2.4.zip`: only `775.v32` and the READ_ME version
   differ from v0.2.3; `KQ5ST.PRG` unchanged; unpacked zip starts with `--natfeats no`).
-  **zkogur to confirm.**
+  Released as v0.2.4 (2026-11-17, the first regular release, not a pre-release). **zkogur to confirm.**
 
 ## Known gaps / risks
 

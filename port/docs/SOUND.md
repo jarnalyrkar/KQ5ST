@@ -253,9 +253,24 @@ also makes in-game seconds real seconds.
 
 Still open: no noise channel (percussion) on the YM, the 33 sounds without any `$13` track (above).
 
-## Speech (CD clips, room 1 only so far; 2026-11-17)
+## Speech (CD clips; room 1 complete, 2026-11-17)
 
-Code: `st/src/speech.c`, `tools/makespeech.py`, `makescr.py` `SPEECH`. Not yet heard by the user.
+Code: `st/src/speech.c`, `tools/makespeech.py`, `makescr.py` `SPEECH`. **User confirmed room 1
+sounds fine** (2026-11-17, first version).
+
+**Covered (125 lines, 6.8 MB):** every line that can show in room 1: rm001 text 1 (all 17), the
+owl region (202 0-4, Look at Cedric 600 0-18, Talk to Cedric 602 0-13: all forest rooms), Main's
+game-wide replies (text 0 except the Quit/debug dialogs 25-26), inventory looks (749 by item
+name, 758 except the formatted pouch line 2), and Cedric's room-1 nag (a literal string, see
+below). Verified headless: 600 18, 0 23, 202 1 and the nag (string key) in room 1.
+**Literal strings**: the Amiga scripts pass some lines as strings, not text resources (`global325`,
+Cedric's per-room nag, `(proc0_28 75 global325)` in the owl region; the CD has a clip per room).
+The start hook now always calls DoAudio; for a "module" >= 1000 speech.c reads the string at heap
+base + near pointer and looks up FNV-1a(text) as key ($f000 | hash bits 16-27, bits 0-15);
+`STRINGS` in makespeech.py lists the exact bytes (with their quotes) and the clip.
+**Pairing helper**: a throwaway `pair.py` listed the Amiga print calls next to the CD Say calls per
+script; where the CD code changed (Main, KQInv) the lines were matched by the surrounding code.
+
 
 - **Data**: `python3 -I tools/makespeech.py "<CD folder>" st/hd` writes `st/hd/SPEECH.DAT`. The CD
   release keeps its speech in `AUDIO001.MAP` (10-byte entries: u16 clip, u32 vol<<28|offset,
@@ -294,3 +309,15 @@ Code: `st/src/speech.c`, `tools/makespeech.py`, `makescr.py` `SPEECH`. Not yet h
   Print (`#dispose`) would stop its clip at once; clips are read whole (up to ~170 KB so far), the
   whole game (1684 clips, ~108 MB at 12517 Hz) would need streaming and a bigger table; the
   cartoons use Talker/other paths, not covered.
+
+### The intro cartoon (rooms 100-109, 114): not done, needs a decision (2026-11-17)
+
+The CD remade the intro (scripts 650-659 `cdIntro*`, `introSlide_*`): no text boxes and no
+per-line clips, but one long recording per scene (clips 10101-10113, 14-194 s; intro10 = 10113,
+194 s) driven by `AudioScript` and a SYNC resource of cue points (CD `RESOURCE.MAP` type $8e,
+in `RESOURCE.001`; entry = u16 ticks, u16 cue, $ffff end; high byte = script beat, low byte = mouth
+shape; 10113 has 64 beats). The Amiga intro shows 1-25 PrintDC boxes per scene (text 100-114).
+Silence detection finds few pauses (music and effects run under the voices), and the beats do
+not map 1:1 to the boxes, so cutting per-line clips needs a transcript with timestamps (no speech
+recogniser installed) or someone listening. `tools/sciextract.py` fails on the CD map; the map is
+SCI1 with 6-byte entries (u16 number, u32 vol<<28|offset), vol header 9 bytes.

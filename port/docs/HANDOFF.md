@@ -272,7 +272,7 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
 7. Desert oasis palms (2026-10-18, GRAPHICS.md "Partly EGA views"): view 354 loops 0-3 now EGA
    (green palms instead of grey/red); art set regenerated, **not yet seen by the user**.
 
-## Speech in room 1 (2026-11-17, not yet heard by the user, not released)
+## Speech in room 1 (2026-11-17, user: sounds fine; complete for room 1; not released)
 - First room after the intro (rm001: the Cedric/Graham conversation from intro10, and the 11
   narrator Look/Do lines) speaks with the CD clips on STE DMA sound. SOUND.md "Speech" has the
   how and what was verified (headless only; the Hatari audio capture came out silent for all
@@ -281,16 +281,12 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
   prog.patch hunk 43.
 - User to try: `st/play.sh`, play through the intro (or debug-teleport to 109) into room 1,
   listen to the conversation, then Look at the house/well/pond.
-- **Start here next session:**
-  1. Ask the user how room 1 sounds in `st/play.sh` (volume against the music, clarity, timing,
-     clicking a box away cuts the line). If it's silent, check `_SND` / the `speech:` log lines
-     first; the Hatari AVI capture is useless for this (silent for all sound).
-  2. Then, as the user prefers: lower the music while speaking (CD `Say` drops masterVolume by
-     4), and/or add more rooms: find the clip numbers in the CD scripts (sluicebox
-     `kq5-cd-dos-1.000.052/src/<room>.sc`, Say N in the same order as the Amiga PrintDC lines)
-     and add them to `LINES` in `tools/makespeech.py`.
-  3. Before going much past a few rooms: stream clips from disk instead of loading each whole
-     (buffer size = largest clip), and cover the cartoon/Talker paths (SOUND.md "Speech", Open).
+- Room 1 complete (125 lines incl. the owl region, game-wide replies and inventory looks).
+- **Start here next session:** the intro (SOUND.md "The intro cartoon"): the CD has one long
+  clip per scene, not per line; decide with the user how to split/attach it (speech recogniser
+  for timestamps, hand alignment, or whole-scene playback). Then further rooms the same way as
+  room 1 (makespeech.py `LINES`), and lowering the music while speaking. Streaming clips is needed
+  before the data gets much bigger than a few rooms' worth of buffer (largest clip 167 KB so far).
 
 ## Speech from the CD release (feasibility, 2026-11-17)
 - CD data: `AUDIO001.MAP` (10-byte entries: u16 num, u32 vol<<28|offset, u32 size; vol 2 = `AUDIO001.002`),

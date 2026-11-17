@@ -282,9 +282,12 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
 - User to try: `st/play.sh`, play through the intro (or debug-teleport to 109) into room 1,
   listen to the conversation, then Look at the house/well/pond.
 - Room 1 complete (125 lines incl. the owl region, game-wide replies and inventory looks).
-- **Start here next session:** the intro (SOUND.md "The intro cartoon"): the CD has one long
-  clip per scene, not per line; decide with the user how to split/attach it (speech recogniser
-  for timestamps, hand alignment, or whole-scene playback). Then further rooms the same way as
+- **Start here next session:** the intro (SOUND.md "The intro cartoon"). **Decided by the user
+  (2026-11-17): transcribe and cut.** Install openai-whisper in a venv in the scratchpad (model
+  download ~150 MB, `python3 -I`, no system pip), transcribe the scene clips 10101-10113 with
+  word timestamps, align the words to the Amiga text lines of each scene (text 100-114, PrintDC
+  order in intro*.sc), cut one clip per text box (music/effects under the voice come along) and
+  add them to makespeech.py (it needs a source of (clip, start, end) cuts, not just whole clips). Then further rooms the same way as
   room 1 (makespeech.py `LINES`), and lowering the music while speaking. Streaming clips is needed
   before the data gets much bigger than a few rooms' worth of buffer (largest clip 167 KB so far).
 

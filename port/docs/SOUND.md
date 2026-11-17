@@ -319,5 +319,6 @@ in `RESOURCE.001`; entry = u16 ticks, u16 cue, $ffff end; high byte = script bea
 shape; 10113 has 64 beats). The Amiga intro shows 1-25 PrintDC boxes per scene (text 100-114).
 Silence detection finds few pauses (music and effects run under the voices), and the beats do
 not map 1:1 to the boxes, so cutting per-line clips needs a transcript with timestamps (no speech
-recogniser installed) or someone listening. `tools/sciextract.py` fails on the CD map; the map is
+recogniser installed) or someone listening. **Decision (user, 2026-11-17): transcribe with
+openai-whisper (word timestamps), align to the Amiga lines, cut a clip per text box.** `tools/sciextract.py` fails on the CD map; the map is
 SCI1 with 6-byte entries (u16 number, u32 vol<<28|offset), vol header 9 bytes.

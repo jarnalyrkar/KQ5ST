@@ -220,6 +220,19 @@ blue: 26, 27, 176, 221, 242, 252, 259, 342, 462, 469, 739, 762, 775, 782, 818, 8
 whole view is consistently "blue-black" rather than flashing; not changed, to be judged in a game
 run (candidates for the same override if a player reports them).
 
+### Fourth player report: Crispin at the chest (2026-11-17)
+
+zkogur: Crispin changes colour when he opens the chest in the intro. In intro10 (room 109,
+states 33-42) he walks in view 1102 and searches the chest in view 775 (loops 4-7), both
+Amiga-only `amiga-16` conversions. The de-collision planned them differently: 1102 has Amiga 0
+→ dark grey 8 and 2 → light grey 7, 775 has 0 → blue 1 and 2 → dark grey 8, so his robe turned
+dark and his dark parts blue for the chest animation. `COLOUR_OVERRIDES` pins 775 to 1102's
+choices (`{0: (8, 8), 2: (7, 7)}`); only `775.v32` changed. Checked as a cel sheet and in a
+headless run (debug teleport to 109, no input; the intro plays to the end): Crispin stays grey
+and black at the chest. 775 was one of the "black became blue" views listed above. Still
+different there: 765/771/764 map Amiga 27 to light blue 9 where 1102 maps it to light grey 7
+(a few hundred pixels); not reported.
+
 ### The game folder in ScummVM (2026-11-07)
 
 Checked with `/usr/games/scummvm` 2026.1.0 (`/usr/local/bin/scummvm` lacks libtheoradec) and the

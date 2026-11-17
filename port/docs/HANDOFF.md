@@ -208,6 +208,16 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
   walks. STE TOS 1.62 unchanged. **Not run under MiNT and not on real hardware**; the reporting
   player should try a test build.
 
+## Work of 2026-11-17
+
+- **zkogur: Crispin changes colour at the chest in the intro** (intro10, room 109). View 775
+  (the chest search) was converted with other colours than his walking view 1102 (robe dark grey,
+  dark parts blue). Fixed with `COLOUR_OVERRIDES` in `makest.py`; only `775.v32` changed
+  (GRAPHICS.md "Fourth player report"). Verified as a cel sheet and in a headless run of the
+  scene. Built as v0.2.4 (`dist/KQ5ST-v0.2.4.zip`: only `775.v32` and the READ_ME version
+  differ from v0.2.3; `KQ5ST.PRG` unchanged; unpacked zip starts with `--natfeats no`).
+  **zkogur to confirm.**
+
 ## Known gaps / risks
 
 0. Start-up from a real hard disk was slow (~94 s black screen in Hatari's ACSI emulation);
@@ -261,3 +271,15 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
    seen by the user** (headless runs stalled at start-up).
 7. Desert oasis palms (2026-10-18, GRAPHICS.md "Partly EGA views"): view 354 loops 0-3 now EGA
    (green palms instead of grey/red); art set regenerated, **not yet seen by the user**.
+
+## Speech from the CD release (feasibility, 2026-11-17, not started)
+- CD data: `AUDIO001.MAP` (10-byte entries: u16 num, u32 vol<<28|offset, u32 size; vol 2 = `AUDIO001.002`),
+  1684 clips, 95 MB raw 8-bit unsigned PCM at 11025 Hz, no headers. Clip numbers are arbitrary (82..10126).
+- CD scripts (sluicebox `kq5-cd-dos-1.000.052`) are the Amiga scripts with each spoken `(PrintDC m i)`
+  replaced by `(Say N)` (Main.sc `Say`: DoAudio audPLAY, wait for end/click). 1242 `Say` calls.
+- A line diff of matching .sc files maps 1096 `Say N` to an Amiga `(Print/PrintDC m i)` automatically;
+  the rest (cartoons/Talker, changed code) need hand work. Amiga scripts still contain `DoAudio` and
+  `Talker startAudio` (global83 = audio on).
+- Plan: table (m,i)->N, patch PrintDC/Print in script 0 to call DoAudio, implement DoAudio in the shim
+  with STE DMA streaming (reuse ScummST's approach), clips pre-converted to signed 12517 Hz (~108 MB).
+  STE only; STF stays text-only.

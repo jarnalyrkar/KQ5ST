@@ -63,7 +63,12 @@ COLOUR_OVERRIDES = {946: {13: (6, 6)},
                     # dance). The de-collision pushed it off black (Dink's body, Amiga 1) and dark
                     # grey (Amiga 2) to blue, so those frames flashed blue legs (player report
                     # 2026-11-08). Keep black, as in the walking view 0.
-                    873: {0: (0, 0)}, 874: {0: (0, 0)}, 1060: {0: (0, 0)}}
+                    873: {0: (0, 0)}, 874: {0: (0, 0)}, 1060: {0: (0, 0)},
+                    # Crispin searching his chest (intro10, states 36-41): the de-collision gave
+                    # 775 Amiga 0 -> blue 1 and 2 -> dark grey 8, while his walking view 1102
+                    # (before and after) has 0 -> dark grey 8 and 2 -> light grey 7, so his robe
+                    # turned blue at the chest (player report 2026-11-17). Use 1102's colours.
+                    775: {0: (8, 8), 2: (7, 7)}}
 
 # Cels redrawn as text: {view: {(loop, cel): (text, pad)}}. 946 loop 0 cels 2-5 = the panel titles
 # (Amiga: 2-pixel strokes with a gold outline, unreadable in 16 colours; user, 2026-11-07). Redrawn

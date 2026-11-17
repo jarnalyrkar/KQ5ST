@@ -170,6 +170,77 @@ HOOKS = [
     (996, 0x08f, 7, user_handle_event_hook),  # User::handleEvent: link 2; pushi 4; push0; lap 1
 ]
 
+# ---- Speech (SOUND.md "Speech", st/src/speech.c) -----------------------------------------------
+# The text procedures start the line's CD clip and stop it when the text box closes:
+#   start (replaces the procedure's `link`): if (u< param[MOD] 1000):
+#     temp0 = (DoAudio 2 param[MOD] param[IDX])  ; clip length in ticks, 0 = no clip
+#     if temp0: temp0 = temp0/60 + 2 (seconds) and every `#time n` (25 n) among the params from
+#       FIRST on gets n = max(n, temp0), so a timed box stays up while the line is spoken
+#   else temp0 = 0
+#   stop (every exit path jumps here): if temp0 (DoAudio 3); acc is kept (in temp1, which both
+#   procedures only use before their Print returns).
+K_DoAudio = 117
+def speech_patch(d, start, mod_p, idx_p, first, tails, retargets):
+    """start: offset of the procedure's 3-byte `link`; tails: (offset, n) of `calle ...; ret`
+    sequences (n bytes, the calle copied to a trampoline that then jumps to stop); retargets:
+    offsets of `jmp` instructions to the procedure's `ret` that now jump to stop."""
+    blocks, end = blocks_of(d)
+    ins = next((p for t, p, sz in blocks if t == 8), end)
+    base = ins + 4
+    t = bytearray(); fix = []; labels = {}
+    def br(op, label): fix.append((len(t) + 1, label)); t.extend(op(0))
+    def lab(n): labels[n] = len(t)
+    replaced = bytes(d[start:start + 3]); assert replaced[0] == 0x3e, replaced.hex()   # link (word)
+    lst = lambda n: b'\x8d' + bytes([n]); lsp = lambda n: b'\x8f' + bytes([n])
+    lapi = lambda n: b'\x97' + bytes([n]); sapi = lambda n: b'\xb7' + bytes([n])
+    inc_at = lambda n: b'\xc5' + bytes([n])
+    callk = lambda k, n: b'\x43' + bytes([k, n])
+    ULT, DIV, ADD = b'\x2a', b'\x08', b'\x02'
+    t += replaced
+    t += lsp(mod_p) + ldi(1000) + ULT;                                    br(bnt, 'notext')
+    t += pushi(3) + pushi(2) + lsp(mod_p) + lsp(idx_p) + callk(K_DoAudio, 6) + sat(0); br(bnt, 'back')
+    t += lst(0) + ldi(60) + DIV + PUSH + ldi(2) + ADD + sat(0)
+    t += ldi(first) + sat(1)
+    lab('loop')
+    t += lst(1) + lap(0) + LT;                                            br(bnt, 'back')
+    t += lat(1) + lapi(0) + PUSH + ldi(25) + EQ;                          br(bnt, 'next')
+    t += lat(1) + lapi(1) + PUSH + lat(0) + LT;                           br(bnt, 'next')
+    t += lst(0) + lat(1) + sapi(1)
+    lab('next')
+    t += inc_at(1);                                                       br(jmp, 'loop')
+    lab('notext')
+    t += ldi(0) + sat(0)
+    lab('back')
+    fix.append((len(t) + 1, ('abs', start + 3))); t += jmp(0)
+    lab('stop')
+    t += sat(1) + lat(0);                                                 br(bnt, 'ret')
+    t += PUSH1 + pushi(3) + callk(K_DoAudio, 2)
+    lab('ret')
+    t += lat(1) + RET
+    for k, (off, n) in enumerate(tails):
+        calle = bytes(d[off:off + n - 1]); assert calle[0] == 0x47 and d[off + n - 1] == 0x48, calle.hex()
+        lab(('tail', k)); t += calle;                                     br(jmp, 'stop')
+    for pos, label in fix:
+        dest = label[1] if isinstance(label, tuple) and label[0] == 'abs' else base + labels[label]
+        t[pos:pos + 2] = struct.pack('<h', dest - (base + pos + 2))
+    if len(t) & 1: t += b'\0'
+    # patch the procedure (offsets below ins, unaffected by the insertion)
+    d[start:start + 3] = jmp(base - (start + 3))
+    for k, (off, n) in enumerate(tails):
+        d[off:off + n] = jmp(base + labels[('tail', k)] - (off + 3)) + b'\0' * (n - 3)
+    for off in retargets:
+        assert d[off] == 0x32, hex(d[off])
+        d[off:off + 3] = jmp(base + labels['stop'] - (off + 3))
+    d[ins:ins] = struct.pack('<HH', 2, len(t) + 4) + t
+    return d
+
+SPEECH = [
+    # PrintDC (script 759, export 0 @ $66): text = param 1, 2; Print gets params from 3 on
+    (759, 0x66, 1, 2, 3, [(0x142, 5)], [0x7c, 0x138]),
+    # proc0_28 (script 0, talker line with a portrait, @ $156d): text = param 2, 3; &rest from 4
+    (0, 0x156d, 2, 3, 4, [(0x15f6, 5)], [0x15e1]),
+]
+
 def blocks_of(d):
     out = []; p = 0
     while p + 4 <= len(d):
@@ -230,6 +301,7 @@ if __name__ == '__main__':
     for n, off, old, new in PATCHES: by_script.setdefault(n, []).append(('bytes', off, old, new))
     for n, obj, sel, fn in METHODS: by_script.setdefault(n, []).append(('method', obj, sel, fn))
     for n, off, cnt, fn in HOOKS: by_script.setdefault(n, []).append(('hook', off, cnt, fn))
+    for n, *args in SPEECH: by_script.setdefault(n, []).append(('speech', args, 0, 0))
     for n, lst in by_script.items():
         d = bytearray(open(os.path.join(RES, str(n)), 'rb').read())
         for kind, a, b, c in lst:
@@ -239,6 +311,8 @@ if __name__ == '__main__':
                 d[a:a + len(c)] = c
             elif kind == 'method':
                 d = replace_method(d, a, b, c)
+            elif kind == 'speech':
+                d = speech_patch(d, *a)
             else:
                 d = hook_method(d, a, b, c)
         path = os.path.join(out, '%d.SCR' % n)

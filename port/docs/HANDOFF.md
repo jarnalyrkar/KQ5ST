@@ -272,7 +272,27 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
 7. Desert oasis palms (2026-10-18, GRAPHICS.md "Partly EGA views"): view 354 loops 0-3 now EGA
    (green palms instead of grey/red); art set regenerated, **not yet seen by the user**.
 
-## Speech from the CD release (feasibility, 2026-11-17, not started)
+## Speech in room 1 (2026-11-17, not yet heard by the user, not released)
+- First room after the intro (rm001: the Cedric/Graham conversation from intro10, and the 11
+  narrator Look/Do lines) speaks with the CD clips on STE DMA sound. SOUND.md "Speech" has the
+  how and what was verified (headless only; the Hatari audio capture came out silent for all
+  sound, so nobody has heard it yet). New: `st/src/speech.c`, `tools/makespeech.py`
+  (`st/hd/SPEECH.DAT`, needs the CD folder), `makescr.py SPEECH` (0.SCR changed, 759.SCR new),
+  prog.patch hunk 43.
+- User to try: `st/play.sh`, play through the intro (or debug-teleport to 109) into room 1,
+  listen to the conversation, then Look at the house/well/pond.
+- **Start here next session:**
+  1. Ask the user how room 1 sounds in `st/play.sh` (volume against the music, clarity, timing,
+     clicking a box away cuts the line). If it's silent, check `_SND` / the `speech:` log lines
+     first; the Hatari AVI capture is useless for this (silent for all sound).
+  2. Then, as the user prefers: lower the music while speaking (CD `Say` drops masterVolume by
+     4), and/or add more rooms: find the clip numbers in the CD scripts (sluicebox
+     `kq5-cd-dos-1.000.052/src/<room>.sc`, Say N in the same order as the Amiga PrintDC lines)
+     and add them to `LINES` in `tools/makespeech.py`.
+  3. Before going much past a few rooms: stream clips from disk instead of loading each whole
+     (buffer size = largest clip), and cover the cartoon/Talker paths (SOUND.md "Speech", Open).
+
+## Speech from the CD release (feasibility, 2026-11-17)
 - CD data: `AUDIO001.MAP` (10-byte entries: u16 num, u32 vol<<28|offset, u32 size; vol 2 = `AUDIO001.002`),
   1684 clips, 95 MB raw 8-bit unsigned PCM at 11025 Hz, no headers. Clip numbers are arbitrary (82..10126).
 - CD scripts (sluicebox `kq5-cd-dos-1.000.052`) are the Amiga scripts with each spoken `(PrintDC m i)`

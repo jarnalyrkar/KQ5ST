@@ -271,6 +271,7 @@ int shim_main(void *bp) {
     { long h = Fopen("KTRACE", 0); if (h >= 0) { Fclose(h); ktrace_on = 1; dbg("kernel trace on\n"); } }
     void blitter_init(void); blitter_init();
     the_lock = dos_lock_dir("");
+    void speech_init(void); speech_init();
 
     /* Prepare the loader message; it is queued when Prog creates "SCIport". */
     loader_msg = mem_alloc(sizeof *loader_msg, 0x10001);
@@ -292,6 +293,7 @@ int shim_main(void *bp) {
      * machine (on a real ST a leftover vector halted the CPU right after Pterm). */
     Supexec(remove_interrupts);
     Supexec(ym_silence);
+    void speech_exit(void); speech_exit();
     input_restore();
     display_restore();
     for (int i = 0; i < 9; i++) Setexc(vecs[i], (void *)old_vecs[i]);

@@ -707,3 +707,17 @@ nf_stderr_id:	.space	4
 nf_exit_id:	.space	4
 	.space	16384
 stack_top:
+
+| DoAudio (kernel 117, hunk 43 +$1a0; prog.patch): speech from SPEECH.DAT on STE DMA sound
+| (speech.c). Called by callk with 4(sp) = args (argc, args...); c_doaudio stores a result in
+| acc (-$7134(a4)) only when it has one: Prog's own DoAudio (no audio hardware) left acc alone.
+	.text
+	.globl	k_doaudio
+k_doaudio:
+	movem.l	%d2-%d7/%a2-%a6,-(%sp)
+	pea	-0x7134(%a4)
+	move.l	4+44+4(%sp),-(%sp)
+	jsr	c_doaudio
+	addq.l	#8,%sp
+	movem.l	(%sp)+,%d2-%d7/%a2-%a6
+	rts

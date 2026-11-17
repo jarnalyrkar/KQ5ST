@@ -252,3 +252,45 @@ GRAPHICS.md is from an older build); Quit reaches a stable desktop with `--natfe
 also makes in-game seconds real seconds.
 
 Still open: no noise channel (percussion) on the YM, the 33 sounds without any `$13` track (above).
+
+## Speech (CD clips, room 1 only so far; 2026-11-17)
+
+Code: `st/src/speech.c`, `tools/makespeech.py`, `makescr.py` `SPEECH`. Not yet heard by the user.
+
+- **Data**: `python3 -I tools/makespeech.py "<CD folder>" st/hd` writes `st/hd/SPEECH.DAT`. The CD
+  release keeps its speech in `AUDIO001.MAP` (10-byte entries: u16 clip, u32 vol<<28|offset,
+  u32 size) + `AUDIO001.002`: 8-bit unsigned PCM, 11025 Hz, no headers. `LINES` in the tool maps a
+  text line (module, index) to a CD clip; the clip is resampled to 12517 Hz (windowed sinc) and
+  stored signed. File format in the tool's docstring. Room 1 = 15 lines, 76 s, 953 KB.
+- **Finding the clip of a line**: the CD scripts (sluicebox `kq5-cd-dos-1.000.052`) are the Amiga
+  scripts with `(PrintDC m i)` replaced by `(Say N)`, in the same order (room 1: PrintDC 1 0..12 →
+  162, 9070, 163, 171, 164-170). Talker conversations became `proc762_0` with a clip array (rm001
+  `local173` = `[1 9106 0 7040 1 9107 0 7041]`: speaker 1 Cedric, 0 Graham) where the Amiga has
+  `proc0_28 view m i ...` lines.
+- **Scripts** (`makescr.py speech_patch`): PrintDC (script 759 export 0, text = params 1, 2) and the
+  talker-line procedure proc0_28 (script 0 `+$156d`, text = params 2, 3) start with
+  `(DoAudio 2 module index)` when the text is a resource line; it returns the clip length in ticks
+  (0 = no clip). With a clip, every `#time n` (25 n) among the Print parameters becomes at least
+  clip seconds + 2, so a timed box stays up while the line is spoken (Cedric's 13.4 s line had a
+  12 s box). Every exit path of both procedures goes through a stub that calls `(DoAudio 3)` (stop)
+  when a clip was started, keeping acc: clicking the box away cuts the speech.
+- **Kernel** (`prog.patch` hunk 43 `+$1a0` → `k_doaudio` in glue.S → `c_doaudio`): Prog's DoAudio
+  is a no-op without Amiga audio hardware (acc untouched). The replacement: Play/WPlay with 3
+  arguments (module, index) loads the clip whole into one buffer (the largest clip, allocated at
+  start-up) and starts STE DMA sound once (mono, 12517 Hz, `$ff8901` = 1); Stop clears `$ff8901`;
+  Position answers only while one of our clips is active. Everything else (Play with a CD clip
+  number from the Amiga Talker/Audio code, which only runs with global 83 set) stays a no-op.
+  Needs `_SND` bit 1 (STE, TT, Falcon) and `SPEECH.DAT`; otherwise text only, as before. Stopped at
+  exit (`speech_exit`).
+- **ScummVM** gets the same patched scripts: its kDoAudio warns about Play with 3 arguments and
+  returns 0, so nothing changes there.
+- **Verified headless** (debug teleport to 109 → intro10 → room 1, `KTRACE`): the four
+  Cedric/Graham lines start and stop their clips, each clip runs to its end in Hatari's DMA
+  emulation ("done" in the log), the long line's box stays 15 s; Look at the house shows the
+  drop-cap box with line 1 5 playing. The intro's own lines (109 n) find no clip and run as before.
+  An audio capture failed: AVI audio from Hatari was silent for everything (YM too), windowed or
+  not, fast-forward or not; not investigated.
+- **Open**: music is not lowered while speaking (the CD's `Say` drops masterVolume by 4); a modeless
+  Print (`#dispose`) would stop its clip at once; clips are read whole (up to ~170 KB so far), the
+  whole game (1684 clips, ~108 MB at 12517 Hz) would need streaming and a bigger table; the
+  cartoons use Talker/other paths, not covered.

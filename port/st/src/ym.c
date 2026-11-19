@@ -31,6 +31,13 @@ static u8  v_ch[NV], v_note[NV], v_sus[NV], v_rel[NV], v_envpos[NV], v_envcnt[NV
 static u16 v_age[NV], v_relage[NV], v_envoff[NV];
 static u8  reverb, sound_on;
 static u16 master;
+/* While speech plays (speech.c) the music is turned down like the CD's Say does with
+ * masterVolume (it subtracts 4; the YM needs a bit more against the 8-bit speech). */
+#define SPEECH_DUCK 5
+int speech_sounding(void);
+void speech_sample(int sound);
+static u8 ducked;
+static int eff_master(void) { int m = master - (ducked ? SPEECH_DUCK : 0); return m > 0 ? m : 0; }
 
 /* patch 101: 128 instrument offsets + envelope strings (pairs volume,ticks; ticks $fe = hold
  * until released; volume $ff = end). Default when no patch: every instrument = "15, hold". */
@@ -104,7 +111,7 @@ static u8 voice_level(int v) {
     int cv = ch_vol[v_ch[v]];
     int vol = cv ? (cv >> 3 ? cv >> 3 : 1) : 0;
     int velo = v_vel[v] ? velo_tab[v_vel[v] >> 3] : 0;
-    int tl = ((vol * velo / 15) * v_envvol[v] / 15) * master;
+    int tl = ((vol * velo / 15) * v_envvol[v] / 15) * eff_master();
     if (tl > 0 && tl < 15) tl = 15;
     return attn_to_level[15 - tl / 15];
 }
@@ -230,6 +237,7 @@ static void controller(int ch, u8 ctl, u8 val) {
         break;
     case 0x4b: set_voices(ch, val); break;
     case 0x7b: for (int v = 0; v < NV; v++) if (v_ch[v] == ch && v_note[v] != 0xff) voice_stop(v); break;
+    case 0x10: speech_sample(val); break;           /* makesnd.py 'sample': the Amiga's sample */
     }
 }
 
@@ -249,7 +257,9 @@ static void envelope(int v) {
     v_envpos[v] += 2; v_envcnt[v] = dur; v_envvol[v] = vol;
 }
 
+static void refresh_levels(void);
 static void service(void) {
+    if (speech_sounding() != ducked) { ducked = !ducked; refresh_levels(); dbg("ym: music %s\n", ducked ? "ducked" : "back"); }
     for (int v = 0; v < NV; v++) {
         if (v_note[v] == 0xff) continue;
         v_age[v]++;

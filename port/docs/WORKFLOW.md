@@ -11,6 +11,8 @@ Index: [`README.md`](README.md). State: [`HANDOFF.md`](HANDOFF.md).
     python3 -I tools/makest.py st/hd   # ST art set as patch files (N.p32 / N.v32), see GRAPHICS.md
     python3 -I tools/makescr.py st/hd  # patched game scripts as patch files (N.SCR), see SCRIPTS.md
     python3 -I tools/makesnd.py st/hd  # patched sound resources as patch files (N.snd), see SOUND.md
+    python3 -I tools/maketext.py st/hd # text lines reworded to the CD's spoken wording (N.TEX), see SOUND.md
+    python3 -I tools/makespeech.py ../dos-cd st/hd   # SPEECH.DAT (CD speech + Amiga samples), see SOUND.md
     python3 -I tools/scidisasm.py extracted/res_amiga 755 [method]   # SCI script disassembler
 
 `build.sh` converts Prog's hunks to GNU as source (`tools/hunk2gas.py`, applying
@@ -80,7 +82,9 @@ found), so a teleported room has no inventory-dependent actors (the bear of room
 fish). With `--natfeats no` the `quit` autoplay command cannot end Hatari (`nf_exit` is a no-op):
 use `--run-vbls` or a `timeout`, otherwise the shim's 250-VBL auto-shots run on until the
 `SHOTnn` counter overflows into garbage file names (~2900 files, 85 MB in 280 s).
-Click coordinates are screen coordinates (picture y + 10). `key 20480` (down arrow) did not walk
+Click coordinates are screen coordinates (picture y + 10). With `--run-vbls` Hatari stops
+without flushing its buffered output: the last ~1000 VBLs of the log can be missing, so run a
+few thousand VBLs past the point you want to see (2026-11-19). `key 20480` (down arrow) did not walk
 Graham in a headless run; clicks do. Hatari takes screenshots on its own every ~250 VBLs as well
 as on `shot`.
 

@@ -98,6 +98,33 @@ delta ticks (`$f8` = +240), running status, sysex skipped, `$fc` = end. Channel 
 channel (tempo, cues: `cf n` = cue n). Amiga sounds carry types 6, $c (all), $13 (208 of 244),
 some 0/9/$12/$16; DOS sounds carry 0, 8, 9, $c, $12, $13 (205 of 245 have $13).
 
+## Amiga sampled effects on DMA sound (2026-11-19: Graham's fall)
+
+85 Amiga sounds carry a digitised sample: a `$fe` channel in their type-6 track (`fe 00`, u16
+rate, u16 size, u16 loop start, u16 loop end, then signed 8-bit data; 5-30 kHz). The Amiga
+driver (`amigasnd.drv`, device 6) played them; ours reports device `$13`, so the interpreter
+never offers them. Sound 83 = Graham's fall (rooms 22, 29-35, 40, 50, 90; script 40's `climb`):
+a 1.3 s fading cry at 10 kHz, peak only 19 of 127; it had no `$13` track (silent on the YM) and a
+short MIDI effect on the MT-32. User request: make it audible.
+
+- `makesnd.py` `'sample'`: replaces the sound's `$13` and `$0c` tracks by one channel: `00 01`
+  (channel 0, 1 voice), `c0 00`, `b0 07 7f`, `0a 40` (the interpreter reads a channel's start
+  as program, volume and pan in exactly this form; other events there shift its parse by a
+  byte), then controller `$10` = sound number, and an ignored controller at the sample's length
+  so the sound lasts as on the Amiga. Controller `$50` did not work: SCI1 treats it as reverb
+  (the interpreter calls driver function 11 and does not pass it on).
+- `ym.c` / `mt32.c` `controller()`: `$10` -> `speech_sample(val)` (from the sound tick, an
+  interrupt).
+- `makespeech.py` `SAMPLES`: the sample, resampled to 12517 Hz and raised to full scale (up to
+  x6), key (`$e000`, sound). `speech.c` reads these into memory at start-up (no GEMDOS from the
+  interrupt) and `speech_sample` plays one on DMA unless a spoken clip is sounding. DoAudio Stop
+  now stops only our clips, and Play stops a sample only when the new line has a clip.
+- Verified headless with sound 83 copied over the fanfare (500.snd in a scratch copy): YM and
+  MT-32 driver both get `$10` = 83 and log `speech: sample 83`; the sound ends after 68 VBLs.
+  A real fall was not reached headless (room 40's path keeps Graham on the ledge).
+- More effects could follow the same way (the list: `fe` channels in sounds 18-140, 200,
+  790-897; on the YM some of them already play a `$13` square-wave version).
+
 ## Verification by recording
 
 Verified 2026-10-17 00:11 with `st/run.sh 5200 tests/intro_sound.txt --sound 44100 --avirecord
@@ -253,7 +280,7 @@ also makes in-game seconds real seconds.
 
 Still open: no noise channel (percussion) on the YM, the 33 sounds without any `$13` track (above).
 
-## Speech (CD clips; room 1 complete, 2026-11-17)
+## Speech (CD clips; room 1 and the intro, 2026-11-19)
 
 Code: `st/src/speech.c`, `tools/makespeech.py`, `makescr.py` `SPEECH`. **User confirmed room 1
 sounds fine** (2026-11-17, first version).
@@ -263,11 +290,40 @@ owl region (202 0-4, Look at Cedric 600 0-18, Talk to Cedric 602 0-13: all fores
 game-wide replies (text 0 except the Quit/debug dialogs 25-26), inventory looks (749 by item
 name, 758 except the formatted pouch line 2), and Cedric's room-1 nag (a literal string, see
 below). Verified headless: 600 18, 0 23, 202 1 and the nag (string key) in room 1.
+**Room by room** (`tools/roomclips.py CDDIR WORK TEXTDIR ROOM`, 2026-11-19): every 16-bit word
+in the CD's room script (uncompressed in its `RESOURCE.001`) that names a clip in `AUDIO001.002`
+is a candidate; whisper transcribes them (cached) and each Amiga line of text ROOM gets the most
+similar one. Clips that only the CD's code reaches (e.g. Talker arrays of other scripts) are
+not found: transcribe neighbouring clip numbers (`roomclips` prints the candidates' range). The
+CD reworded some narration and added lines with no Amiga text (room 2: the snake's speech, its
+death narration); the added ones are left out. **Reworded lines take the CD wording** (user's
+choice, 2026-11-19): `tools/maketext.py` writes `N.TEX` patch files with the new text, proofread
+from the transcript (whisper's slips fixed, Amiga punctuation kept), so box and voice agree.
+Room 2 checked in the game: Cedric's box reads "Graham, watch out! A poisonous snake!". Rooms
+done before this rule (1, 76, the intro) keep their Amiga text. **Room 2** (the snake): 2 0, 2 1 (Cedric's warning, checked
+headless), 2 3, 2 4 (Look), 2 6 (Talk), 2 7 (other items), and room 2's literal copy of the
+tambourine line (`STRINGS`, clip 174). Not covered: 2 2 (the CD changed the tambourine scene) and
+2 5 (Do: on the CD the snake answers itself, "Stay away! This is my path.").
+**Rebuilding SPEECH.DAT while the game runs** (2026-11-19): speech.c reads the table once at
+start-up and the clips from the file on each line, and Hatari's GEMDOS drive reads `st/hd`
+live. After `makespeech.py` adds clips the data behind them moves, so a running game plays the
+wrong audio (the user heard Crispin's 76 0 under Cedric's room-1 nag: the old nag offset now
+falls 48 bytes before 76 0). Restart the game after rebuilding.
+**Crispin's house** (rm076, entered through the door of room 1; 2026-11-19, user): text 76 0-3
+(Crispin 0-2, Graham 3) through proc0_28. The CD's rm076 (uncompressed in its `RESOURCE.001`)
+has `(Say 9109)` and the Talker array `[0 9110 0 9111 1 9100]`; whisper confirmed each clip.
+Headless (teleport 76): all four start and play to the end.
 **Literal strings**: the Amiga scripts pass some lines as strings, not text resources (`global325`,
 Cedric's per-room nag, `(proc0_28 75 global325)` in the owl region; the CD has a clip per room).
 The start hook now always calls DoAudio; for a "module" >= 1000 speech.c reads the string at heap
 base + near pointer and looks up FNV-1a(text) as key ($f000 | hash bits 16-27, bits 0-15);
 `STRINGS` in makespeech.py lists the exact bytes (with their quotes) and the clip.
+**All rooms' nags** (2026-11-19, user: no audio for "nothing here", room 7): 25 room scripts set
+a nag (`lofsa "..."; sag 325`, 20 distinct texts). The CD sets a clip number there instead
+(`ldi N; sag 325`); that byte pattern in the CD's `RESOURCE.001`, mapped to scripts through
+`RESOURCE.MAP`, gives each room's clip (3020-3083; transcribing clips 3000-3099 agreed). 18 texts
+covered; room 12's CD clip 3051 does not exist in its audio, and room 40's CD clip (3044, room
+10's words) does not match the Amiga text, so both stay silent. Room 7 checked headless.
 **Pairing helper**: a throwaway `pair.py` listed the Amiga print calls next to the CD Say calls per
 script; where the CD code changed (Main, KQInv) the lines were matched by the surrounding code.
 
@@ -305,20 +361,85 @@ script; where the CD code changed (Main, KQInv) the lines were matched by the su
   drop-cap box with line 1 5 playing. The intro's own lines (109 n) find no clip and run as before.
   An audio capture failed: AVI audio from Hatari was silent for everything (YM too), windowed or
   not, fast-forward or not; not investigated.
-- **Open**: music is not lowered while speaking (the CD's `Say` drops masterVolume by 4); a modeless
-  Print (`#dispose`) would stop its clip at once; clips are read whole (up to ~170 KB so far), the
-  whole game (1684 clips, ~108 MB at 12517 Hz) would need streaming and a bigger table; the
-  cartoons use Talker/other paths, not covered.
+- **Open**: clips are read whole (up to 209 KB so far, the intro), the whole game (1684 clips, ~108 MB at
+  12517 Hz) would need streaming and a bigger table; the later cartoons (text 110-112: Pearl, the
+  fisherman; the ending) are not cut yet (`speechalign.py` with new `SCENES`).
 
-### The intro cartoon (rooms 100-109, 114): not done, needs a decision (2026-11-17)
+### The intro cartoon (rooms 100-109, 114): spoken (2026-11-19)
 
 The CD remade the intro (scripts 650-659 `cdIntro*`, `introSlide_*`): no text boxes and no
 per-line clips, but one long recording per scene (clips 10101-10113, 14-194 s; intro10 = 10113,
-194 s) driven by `AudioScript` and a SYNC resource of cue points (CD `RESOURCE.MAP` type $8e,
-in `RESOURCE.001`; entry = u16 ticks, u16 cue, $ffff end; high byte = script beat, low byte = mouth
-shape; 10113 has 64 beats). The Amiga intro shows 1-25 PrintDC boxes per scene (text 100-114).
-Silence detection finds few pauses (music and effects run under the voices), and the beats do
-not map 1:1 to the boxes, so cutting per-line clips needs a transcript with timestamps (no speech
-recogniser installed) or someone listening. **Decision (user, 2026-11-17): transcribe with
-openai-whisper (word timestamps), align to the Amiga lines, cut a clip per text box.** `tools/sciextract.py` fails on the CD map; the map is
-SCI1 with 6-byte entries (u16 number, u32 vol<<28|offset), vol header 9 bytes.
+194 s; 10101/10102 are music only) driven by `AudioScript` and a SYNC resource of cue points (CD
+`RESOURCE.MAP` type $8e, in `RESOURCE.001`; entry = u16 ticks, u16 cue, $ffff end; high byte =
+script beat, low byte = mouth shape). The beats do not map 1:1 to the Amiga's PrintDC boxes
+(text 100-109, 114; 101 = credits and 113 are not spoken; 110-112 are later cartoons). The CD
+mixed music and effects into these recordings: between the lines they sit ~10 dB under the voices.
+`tools/sciextract.py` fails on the CD map; it is SCI1 with 6-byte entries (u16 number, u32
+vol<<28|offset), vol header 9 bytes.
+
+**How the cuts were made** (`tools/speechalign.py`, docstring has the commands):
+- faster-whisper (Whisper `small.en`, CTranslate2, no PyTorch; installed in a venv in the
+  scratchpad, `pip install faster-whisper`; its PyAV did not take `metadata_errors`, so the tool
+  feeds 16 kHz float samples made by ffmpeg) transcribed the ten speech clips with word timestamps.
+- `align`: the Amiga lines of each scene (`SCENES`, in spoken order; 109 23-24 "No, that won't
+  do." / "That's all used up." come between 9 and 10) are matched word by word to the transcript
+  (difflib; punctuation dropped, repeated letters collapsed so "Hmmmm" = "Hmm"). A cut runs from
+  the line's first matched word to its last, 0.3 s before / 0.45 s after but never past the middle
+  of the pause to the neighbouring line; leading "Oh,"/"Well," the CD adds go with the line.
+  Four ends set by hand from the loudness (`OVERRIDE`): 107 1 (whisper stretched "There" over
+  8 s of music), 114 2 (Cedric's "Whoa" and crash, no words recognised), 100 2 ("Follow meeee"
+  fades for 3 s), 109 24.
+- Second pass (2026-11-19, user: "against the likes of Mordack" cut off): whisper's "Mordak"
+  did not match the text, so 114 9 ended 0.45 s after "of". Closely following unmatched words now
+  go with the line (not into a following line that had no words recognised, e.g. 108 5, 114 2).
+  Lines that run into each other were cut where whisper let the words touch; the boundary is now
+  the quietest 50 ms up to 0.4 s later (or, with a real gap, inside the gap only: loud music under
+  109 4/5 otherwise put it inside "I used to"). 13 cuts moved, 114 9 by 0.3 s, 114 5/6 by 0.14,
+  108 4/5 by 0.15, 109 1/2 by 0.25, 109 18/19 by 0.3; all re-transcribed. Silence-based checks
+  of cut ends do not work here: the CD music under the voices is often as loud as the tail.
+- `verify`: every cut transcribed alone and compared with its text: 52 of 57 matched; the rest
+  are 114 2 (the yell), 109 19 ("M-m-me?", a stammer), 108 5 ("Aye, aye, Crispin" heard as
+  "Whoo, I like mister"), and 100 2 / 109 24, which whisper hears right in the whole clip but not
+  alone. The table went into `makespeech.py` `INTRO_CUTS` (59 lines, 322 s, 4 MB; largest cut
+  105 0, 16.7 s = 209 KB, which is now the clip buffer). Single cuts to listen to:
+  `port/work/speech_intro/M_II.wav` (not in git).
+
+**Modeless boxes** (`makescr.py`): the intro prints `(PrintDC m i #at x y #dispose)` and times the
+box with `(proc932_2 english other)` -> `seconds`. The PrintDC patch used to stop the clip when
+PrintDC returned, i.e. at once; now a `#dispose` among the parameters keeps the clip playing (to
+its end, or until the next line replaces it). The parameter scan also had an off-by-one (SCI
+parameters count from 1; the last one was never looked at). `SPEECH_WAIT` wraps script 932's
+language picker (export 2 @ `$a5`): it returns max(its value, seconds left of the clip), from
+`(DoAudio 6 1)` (speech.c; Prog without speech leaves acc, ScummVM answers -1, so nothing changes
+there). Its two other callers (script 28 view, 763 warning-box width) pick values >= 113.
+Scenes 102, 104, 108 and 109 instead set a constant after the print (`calle script759 0; ldi N;
+aTop 18` = seconds N, 23 sites); `makescr.py` `seconds_hook` turns each into seconds =
+max(N, seconds left), found by byte pattern (`SECONDS_SCRIPTS`). Scenes 100, 102 and 109 also
+wait for music cues (`(if (< (global397 prevSignal) N) state--)`, cycles 1, some also
+`(!= signal -1)` = music ended; 21 sites, `MUSIC_WAIT_SCRIPTS`): while a clip is playing,
+`music_wait_hook` compares with 32767 instead of N / -1, so the next line waits for the spoken one (109 2, 4, 7 were cut by up to 3 s before). The
+scene may then trail the music by that much; later cues are music positions, so it catches up.
+
+**After the user's first listen (2026-11-19)**: text and speech in sync, but the music was far
+too loud, "it'll help you to fly" (114 12) was cut by the next line, and some replies came after
+long pauses. Changes:
+- *Ducking*: `ym.c` and `mt32.c` check `speech_sounding()` (DMA play bit) in their Service (60 Hz)
+  and play at master volume - 5 (`SPEECH_DUCK`) while a clip sounds (the CD's `Say` subtracts 4);
+  the YM logs `ym: music ducked/back`. Ducked and restored 63 times in the intro run.
+- *Louder clips*: `makespeech.py` scales every clip to a peak of ~124 (at most x3); the CD clips
+  peaked at 46-128, median 81.
+- *Timing*: while a clip plays, the waits use the clip instead of the reading time: the 932
+  picker and the `ldi N; aTop 18` sites give seconds = seconds left + 1 (seconds count whole
+  seconds and end up to 1 s early, so +1 never cuts a line; the pause after a line is 0-2 s);
+  PrintDC `#time n` becomes clip/60 + 2 instead of max(n, that). Room 1's talker gaps 4-5 s -> 2 s;
+  104 1 16 s -> 9 s. The remaining long gaps are the Amiga scenes' own animations and music cues
+  (e.g. after 114 8 Graham's EndLoop), not loading (a 100 KB clip reads in ~0.1 s even from a
+  real ACSI disk). Headless timings of animation states vary by several seconds between runs.
+- *acc fix*: the print patch, the 932 wrapper and the hooks load 0 before calling DoAudio; Prog's
+  DoAudio leaves acc alone without speech (STF, 1 MB, no SPEECH.DAT), and the old code then read
+  whatever acc held as a clip length (now it would have replaced the box time).
+
+**Memory**: speech is switched off when less than 1 MB of the shim's pool would be left after
+the table and the clip buffer (`SPEECH_MIN_LEFT`). On a 1 MB STE (pool 596 KB) the 209 KB buffer
+made the loader's 224 KB heap allocation fail at start-up (bus error); now it says
+`speech: off` and runs text-only.

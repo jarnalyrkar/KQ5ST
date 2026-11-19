@@ -178,9 +178,17 @@ HOOKS = [
 #                                                ; is a string (speech.c hashes its text)
 #     if temp0: temp0 = temp0/60 + 2 (seconds) and every `#time n` (25 n) among the params from
 #       FIRST on (FIRST-1 for a string, whose Print parameters start right after it) gets
-#       n = max(n, temp0), so a timed box stays up while the line is spoken
+#       n = temp0: a timed box stays up while the line is spoken, and no longer than that (the
+#       reading time n made spoken lines wait; 2026-11-19, user)
+#     a `#dispose` (107) among them makes the box modeless (Print returns at once): temp0 = 0, so
+#       the clip is not stopped and plays to its end or until the next line replaces it
 #   stop (every exit path jumps here): if temp0 (DoAudio 3); acc is kept (in temp1, which both
 #   procedures only use before their Print returns).
+# The cartoons time their modeless boxes with (proc932_2 english other) -> `seconds`; speech_wait
+# makes it return the seconds left of the playing clip + 1 instead (whole seconds: the wait ends
+# 0-1 s early, so +1 never cuts the line), from (DoAudio 6 1) in speech.c (Prog and ScummVM leave
+# acc / answer -1, so nothing changes there). Values > 30 are kept: its other two callers
+# (script 28, 763) pick values >= 113.
 K_DoAudio = 117
 def speech_patch(d, start, mod_p, idx_p, first, tails, retargets):
     """start: offset of the procedure's 3-byte `link`; tails: (offset, n) of `calle ...; ret`
@@ -197,17 +205,20 @@ def speech_patch(d, start, mod_p, idx_p, first, tails, retargets):
     lapi = lambda n: b'\x97' + bytes([n]); sapi = lambda n: b'\xb7' + bytes([n])
     inc_at = lambda n: b'\xc5' + bytes([n])
     callk = lambda k, n: b'\x43' + bytes([k, n])
-    ULT, DIV, ADD = b'\x2a', b'\x08', b'\x02'
+    ULT, DIV, ADD, LE = b'\x2a', b'\x08', b'\x02', b'\x24'
     t += replaced
-    t += pushi(3) + pushi(2) + lsp(mod_p) + lsp(idx_p) + callk(K_DoAudio, 6) + sat(0); br(bnt, 'back')
+    t += ldi(0) + pushi(3) + pushi(2) + lsp(mod_p) + lsp(idx_p) + callk(K_DoAudio, 6) + sat(0); br(bnt, 'back')   # acc stays 0 without speech
     t += lst(0) + ldi(60) + DIV + PUSH + ldi(2) + ADD + sat(0)
     t += ldi(first) + sat(1)
     t += lsp(mod_p) + ldi(1000) + ULT;                                    br(bt, 'loop')
     t += dec_at(1)                          # a string: the Print parameters start one earlier
     lab('loop')
-    t += lst(1) + lap(0) + LT;                                            br(bnt, 'back')
+    t += lst(1) + lap(0) + LE;                                            br(bnt, 'back')   # params are 1-based
+    t += lat(1) + lapi(0) + PUSH + ldi(107) + EQ;                         br(bnt, 'time')
+    t += ldi(0) + sat(0);                                                 br(jmp, 'next')
+    lab('time')
     t += lat(1) + lapi(0) + PUSH + ldi(25) + EQ;                          br(bnt, 'next')
-    t += lat(1) + lapi(1) + PUSH + lat(0) + LT;                           br(bnt, 'next')
+    t += lat(0);                                                          br(bnt, 'next')   # (0 after #dispose)
     t += lst(0) + lat(1) + sapi(1)
     lab('next')
     t += inc_at(1);                                                       br(jmp, 'loop')
@@ -235,12 +246,75 @@ def speech_patch(d, start, mod_p, idx_p, first, tails, retargets):
     d[ins:ins] = struct.pack('<HH', 2, len(t) + 4) + t
     return d
 
+def speech_wait_patch(d, proc):
+    """Point the export at `proc` to a wrapper: r = (proc &rest); s = (DoAudio 6 1);
+    s > 0 and r <= 30 ? s + 1 : r."""
+    blocks, end = blocks_of(d)
+    exp = next(p for t, p, sz in blocks if t == 7)
+    cnt = struct.unpack('<H', d[exp + 4:exp + 6])[0]
+    slot = next(exp + 6 + 2 * i for i in range(cnt) if struct.unpack('<H', d[exp + 6 + 2 * i:exp + 8 + 2 * i])[0] == proc)
+    ins = next((p for t, p, sz in blocks if t == 8), end)
+    base = ins + 4
+    lst = lambda n: b'\x8d' + bytes([n]); GT = b'\x1e'
+    t = bytearray(link(2) + PUSH0 + b'\x59\x01')                         # push0 &rest 1
+    t += b'\x40' + struct.pack('<h', proc - (base + len(t) + 4)) + b'\x00'   # call proc 0
+    t += sat(0) + ldi(0) + b'\x7a' + pushi(6) + PUSH1 + b'\x43' + bytes([K_DoAudio, 4]) + sat(1)   # acc 0 if no clip
+    ADD, LE = b'\x02', b'\x24'
+    t += lst(1) + ldi(0) + GT + bnt(16)                               # a clip is playing
+    t += lst(0) + ldi(30) + LE + bnt(7)                               # and the value is a time
+    t += lst(1) + ldi(1) + ADD + RET                                  # -> seconds left + 1
+    t += lat(0) + RET
+    if len(t) & 1: t += b'\0'
+    d[ins:ins] = struct.pack('<HH', 2, len(t) + 4) + t
+    struct.pack_into('<H', d, slot, base)
+    return d
+
 SPEECH = [
     # PrintDC (script 759, export 0 @ $66): text = param 1, 2; Print gets params from 3 on
     (759, 0x66, 1, 2, 3, [(0x142, 5)], [0x7c, 0x138]),
     # proc0_28 (script 0, talker line with a portrait, @ $156d): text = param 2, 3; &rest from 4
     (0, 0x156d, 2, 3, 4, [(0x15f6, 5)], [0x15e1]),
 ]
+SPEECH_WAIT = [(932, 0xa5)]     # the language picker the cartoons time their boxes with
+
+# The intro scenes that time a modeless box with a constant, `(PrintDC ...) (= seconds N)`
+# (`calle script759 0; ldi N; aTop 18`, 23 sites in 102, 104, 108, 109; none is a branch target
+# past its first byte), get seconds = seconds left of the clip + 1 (N without a clip).
+SECONDS_SCRIPTS = (102, 104, 108, 109)
+sbyte = lambda v: v - 256 if v >= 128 else v       # the byte form of ldi is signed (`ldi 255` = -1)
+def seconds_hook(replaced):
+    assert replaced[0] == 0x35 and replaced[2:] == b'\x65\x12', replaced.hex()
+    left = ldi(0) + b'\x7a' + pushi(6) + PUSH1 + b'\x43' + bytes([K_DoAudio, 4])   # acc = (DoAudio 6 1)
+    n = ldi(sbyte(replaced[1]))
+    plus1 = PUSH + ldi(1) + b'\x02'
+    code = left + PUSH + ldi(0) + b'\x1e'               # a clip is playing?
+    code += bnt(len(left) + len(plus1) + 3) + left + plus1 + jmp(len(n))   # yes: seconds left + 1
+    return code + n + b'\x65\x12'                        # no: N; then seconds = acc
+def seconds_sites(n):
+    import re
+    d = open(os.path.join(RES, str(n)), 'rb').read()
+    pat = re.escape(b'\x46\xf7\x02\x00\x00') + b'.' + re.escape(b'\x35') + b'.' + re.escape(b'\x65\x12')
+    return [(n, m.start() + 6, 4, seconds_hook) for m in re.finditer(pat, d, re.S)]
+HOOKS += [h for n in SECONDS_SCRIPTS for h in seconds_sites(n)]
+
+# Scenes 100, 102 and 109 also wait for music cues: `(if (< (global397 prevSignal) N) state--)`
+# with cycles 1 (`lag 397; send 4; push; ldi N; lt?`, 16 sites), some also `(!= signal 255)`
+# (music ended; `35 ff` = ldi -1; ne?). While a clip of ours is still playing the hook compares with
+# 32767 instead of N / 255, so the next line waits for the spoken one.
+# ((DoAudio 6 1) > 0: ScummVM's -1 and Prog's no-op leave the wait as it was.)
+MUSIC_WAIT_SCRIPTS = (100, 102, 109)
+def music_wait_hook(replaced):
+    assert replaced[:2] == b'\x36\x35', replaced.hex()
+    code = PUSH + ldi(0) + b'\x7a' + pushi(6) + PUSH1 + b'\x43' + bytes([K_DoAudio, 4])
+    code += PUSH + ldi(0) + b'\x1e'                       # seconds left > 0?
+    code += bnt(6) + ldi(0x7fff) + jmp(3)                 # yes: keep waiting
+    return code + ldi(sbyte(replaced[2]))                 # no: the scene's own cue
+def music_wait_sites(n):
+    import re
+    d = open(os.path.join(RES, str(n)), 'rb').read()
+    pat = re.escape(b'\x80\x8d\x01\x4a\x04\x36\x35') + b'(.\x22|\xff\x1c)'    # < N, != 255
+    return [(n, m.start() + 5, 3, music_wait_hook) for m in re.finditer(pat, d, re.S)]
+HOOKS += [h for n in MUSIC_WAIT_SCRIPTS for h in music_wait_sites(n)]
 
 def blocks_of(d):
     out = []; p = 0
@@ -303,6 +377,7 @@ if __name__ == '__main__':
     for n, obj, sel, fn in METHODS: by_script.setdefault(n, []).append(('method', obj, sel, fn))
     for n, off, cnt, fn in HOOKS: by_script.setdefault(n, []).append(('hook', off, cnt, fn))
     for n, *args in SPEECH: by_script.setdefault(n, []).append(('speech', args, 0, 0))
+    for n, proc in SPEECH_WAIT: by_script.setdefault(n, []).append(('wait', proc, 0, 0))
     for n, lst in by_script.items():
         d = bytearray(open(os.path.join(RES, str(n)), 'rb').read())
         for kind, a, b, c in lst:
@@ -314,6 +389,8 @@ if __name__ == '__main__':
                 d = replace_method(d, a, b, c)
             elif kind == 'speech':
                 d = speech_patch(d, *a)
+            elif kind == 'wait':
+                d = speech_wait_patch(d, a)
             else:
                 d = hook_method(d, a, b, c)
         path = os.path.join(out, '%d.SCR' % n)

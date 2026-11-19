@@ -24,6 +24,10 @@
 static u8 ch_prog[NCH], ch_vol[NCH], ch_hold[NCH], ch_voices[NCH];
 static u16 ch_bend[NCH];
 static u8 master = 15, sound_on = 1, reverb, running;
+#define SPEECH_DUCK 5                                /* see ym.c */
+int speech_sounding(void);
+void speech_sample(int sound);
+static u8 ducked;
 static u8 reverb_cfg[11][3], have_patch;
 static const u8 *goodbye;
 
@@ -82,7 +86,8 @@ static void sysex(u32 addr, const u8 *data, int len) {
 }
 
 static void send_volume(int ch) {
-    midi_msg(0xb0 | ch, 7, sound_on ? ch_vol[ch] * master / 15 : 0, 3);
+    int m = master - (ducked ? SPEECH_DUCK : 0);
+    midi_msg(0xb0 | ch, 7, sound_on && m > 0 ? ch_vol[ch] * m / 15 : 0, 3);
 }
 
 static void all_notes_off(void) {
@@ -147,6 +152,7 @@ static void controller(int ch, int ctl, int val) {
     case 7:    ch_vol[ch] = val; send_volume(ch); return;
     case 0x40: ch_hold[ch] = val; break;
     case 0x4b: ch_voices[ch] = val; return;          /* SCI voice allocation: not MIDI */
+    case 0x10: speech_sample(val); return;           /* makesnd.py 'sample': the Amiga's sample */
     case 1: case 10: case 11: case 0x79: case 0x7b: break;
     default:   return;                               /* other SCI-specific controllers */
     }
@@ -179,7 +185,7 @@ void c_Mt32Driver(R) {
      * music 29 + ambience 886) were moved to channels 12-15, which the MT-32 ignores. */
     case 1:  driver_init((const u8 *)r->a[0]); r->d[0] = 0x00080001; r->d[1] = 0; break;
     case 2:  all_notes_off(); if (goodbye) sysex(0x200000, goodbye, 20); break;
-    case 3:  break;
+    case 3:  if (speech_sounding() != ducked) { ducked = !ducked; for (int c = 0; c < NCH; c++) send_volume(c); } break;
     case 4:  midi_msg(0x80 | ch, d1, 0x40, 3); break;
     case 5:  if (sound_on) midi_msg(0x90 | ch, d1, d1 >> 16, 3); break;
     case 7:  controller(ch, d1 & 0xff, (d1 >> 16) & 0x7f); break;

@@ -23,6 +23,11 @@ SOUNDS: sound number -> dict with
              'hold_last_note', PROGRAM: insert a program change to PROGRAM right before the
                channel's last note-on, so that note plays with that instrument's envelope.
            Several edits on the same channel are applied in order.
+  'sample': [device track types] - the Amiga plays this sound's digitised sample (the `$fe`
+           channel of its type-6 track). Each listed track is replaced by one channel that sends
+           controller $10 = sound number (the YM and MT-32 drivers then start the sample on STE
+           DMA sound, speech.c speech_sample; makespeech.py puts the samples in SPEECH.DAT) and
+           ends after the sample's length, so the sound lasts as long as on the Amiga.
 Check the result by ear with tools/sndvoices.py (it reads N.snd files too)."""
 import os, struct, sys
 
@@ -57,7 +62,12 @@ SOUNDS = {
     51: {'from_dos': [0x13]},
     785: {'from_dos': [0x13]},
     787: {'from_dos': [0x13]},
+    # Graham's fall (rooms 22, 29-35, 40, 50, 90): on the Amiga a 1.3 s sampled cry; the YM had
+    # nothing (no $13 track), the MT-32 a short MIDI effect. Both play the sample now (user
+    # request 2026-11-19).
+    83: {'sample': [0x13, 0x0c]},
 }
+SAMPLE_CTL = 0x10                                     # ym.c / mt32.c: controller -> speech_sample ($50 is SCI reverb)
 
 SRC_DOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'extracted', 'res_dos', 'sound')
 
@@ -148,6 +158,22 @@ def rebuild(d, spec):
                 ents.append(c[:2] + struct.pack('<HH', copied[off], sz))
             added.append((t, ents))
         extra = bytes(extra)
+    if spec.get('sample'):
+        n = spec['n']
+        o = next(entry_off_size(c)[0] for t, ch in tracks if t == 6 for c in ch if d[entry_off_size(c)[0]] == 0xfe)
+        rate, size = struct.unpack_from('<HH', d, o + 2)
+        ticks = (size * 60 + rate - 1) // rate + 1   # SCI ticks are 1/60 s
+        # channel 0, 1 voice; the interpreter reads the start of a channel as program, volume and
+        # pan in a fixed form (c0 pp, b0 07 vv, 0a pp with running status, as every real channel
+        # begins; anything else there throws its parse off), then comes the trigger
+        ev = bytearray(b'\x00\x01' + bytes([0, 0xc0, 0, 0, 0xb0, 7, 127, 0, 0x0a, 0x40,
+                                              0, 0xb0, SAMPLE_CTL, n & 0x7f]))
+        while ticks >= 240: ev.append(0xf8); ticks -= 240
+        ev += bytes([ticks, 0xb0, SAMPLE_CTL + 1, 0, 0, 0xfc])   # an ignored controller, then the end
+        off = len(d) + len(extra); extra = bytes(extra) + bytes(ev)
+        for t in spec['sample']:
+            spec.setdefault('drop', []).append(t) if t in dict(tracks) else None
+            added.append((t, [b'\x00\x00' + struct.pack('<HH', off, len(ev))]))
     out_tracks = []
     for t, chans in tracks:
         if t in spec.get('drop', []): continue

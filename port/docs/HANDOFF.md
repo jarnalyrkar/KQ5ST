@@ -246,6 +246,8 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
 
 ## Next
 
+- **Speech, the main line of work**: follow "Speech: where it stands and how to finish it cheaply"
+  below (batch-transcribe all clips, batch-match, review only exceptions).
 - zkogur to confirm v0.2.2 (Dink colours, labyrinth soft lock; published 2026-11-08); the bear in a game run (with the fish) is still unconfirmed, as is v0.2.0's MT-32,
   tempo, speed and interpreter rewrite beyond "all changes look good" on v0.2.1.
 - User to re-listen with Munt: town and bee-hive music, overall tempo vs the original.
@@ -282,14 +284,88 @@ GEMDOS drive (to the settings panel) and from an AHDI ACSI image (to the cartoon
 - User to try: `st/play.sh`, play through the intro (or debug-teleport to 109) into room 1,
   listen to the conversation, then Look at the house/well/pond.
 - Room 1 complete (125 lines incl. the owl region, game-wide replies and inventory looks).
-- **Start here next session:** the intro (SOUND.md "The intro cartoon"). **Decided by the user
-  (2026-11-17): transcribe and cut.** Install openai-whisper in a venv in the scratchpad (model
-  download ~150 MB, `python3 -I`, no system pip), transcribe the scene clips 10101-10113 with
-  word timestamps, align the words to the Amiga text lines of each scene (text 100-114, PrintDC
-  order in intro*.sc), cut one clip per text box (music/effects under the voice come along) and
-  add them to makespeech.py (it needs a source of (clip, start, end) cuts, not just whole clips). Then further rooms the same way as
-  room 1 (makespeech.py `LINES`), and lowering the music while speaking. Streaming clips is needed
-  before the data gets much bigger than a few rooms' worth of buffer (largest clip 167 KB so far).
+- The intro (decided 2026-11-17: transcribe and cut) was done on 2026-11-19, see below.
+
+## Intro cartoon speech (2026-11-19; not committed or released yet, not heard by the user)
+- All 59 spoken intro lines (text 100, 102-105, 107-109, 114) have a clip cut from the CD's
+  per-scene recordings (SOUND.md "The intro cartoon"): faster-whisper word timestamps, aligned by
+  `tools/speechalign.py`, every cut re-transcribed as a check, table in `makespeech.py`
+  `INTRO_CUTS`. `SPEECH.DAT` is now 184 lines, 10.8 MB; clip buffer 209 KB.
+- Script fixes so the lines are heard whole (`makescr.py`): PrintDC with `#dispose` no longer
+  stops its clip (and the parameter scan saw the last parameter for the first time); the cartoon
+  timings (932 language picker, `ldi N; aTop 18` after a print, music-cue waits) wait for the
+  clip. `speech.c`: `(DoAudio 6 1)` = seconds left; speech off when less than 1 MB would be left
+  (a 1 MB STE crashed at start-up with the bigger buffer; now text-only).
+- Verified headless at 4 MB (debug teleport 100, Watch it, `KTRACE`): all 59 lines start and
+  play to the end, the intro runs on into room 1 and its conversation. 1 MB: starts, `speech:
+  off`. Nobody has listened yet: the CD mixed music/effects under the voices (~10 dB down), which
+  may clash with the YM/MT-32 music. Single cuts: `port/work/speech_intro/*.wav`.
+- Found today: `st/hd` had been overwritten at 11:02 (looked like a release unpack: no
+  `SPEECH.DAT`, no `759.SCR`); rebuilt (`build.sh`, `makescr.py`, `makespeech.py ../dos-cd`).
+  The user's `~/.config/hatari/hatari.cfg` had `nMemorySize = 1024` (1 MB; neither `play.sh` nor
+  `run.sh` passes `--memsize`); set back to 4096 at the user's request (STE, 68000 8 MHz, TOS
+  1.62, 4 MB; old file kept as `hatari.cfg.bak-1mb`). Checked: pool 3668 KB, speech on.
+- User listened (2026-11-19): in sync; music too loud, 114 12 cut, long pauses before replies.
+  Fixed the same day (SOUND.md "After the user's first listen"): music ducked while speaking,
+  clips at full scale, waits follow the clip (+1 s) instead of the reading time. Headless: all 63
+  lines heard to the end, ducking 63 times. User: music and waits much better; "against the
+  likes of Mordack" (114 9) cut: fixed with 12 other cut ends (SOUND.md, second pass).
+  Cedric's nag had audio only in room 1; now in every room that has a CD clip (18 texts, not
+  rooms 12 and 40; SOUND.md "All rooms' nags"). SPEECH.DAT 201 lines, 11.4 MB.
+  Graham's fall cry (Amiga sample of sound 83) now plays on DMA sound with the YM and MT-32
+  drivers (SOUND.md "Amiga sampled effects"); checked through the fanfare slot, not in a real fall.
+  Crispin's house (room 76, reachable from room 1) speaks: 4 lines (SOUND.md "Crispin's house").
+  Room 2 (the snake): 7 lines via the new `tools/roomclips.py`. User's rule for reworded CD lines:
+  change the text to the CD wording (`tools/maketext.py`, `2.TEX`). CD-only lines (snake speech,
+  death narration) left out. Next: rooms 3 (town) etc. the same way.
+  **User tests the next build themselves.**
+- **Next:** decide whether the CD's background under the voices is acceptable; the later cartoons (110-112, ending) with `speechalign.py`; further rooms (`LINES`);
+  streaming.
+
+## Speech: where it stands and how to finish it cheaply (2026-11-19)
+
+**Done** (all uncommitted at the time of writing; user tests each build in `st/play.sh`):
+room 1 and the game-wide lines (Main, inventory, owl region), the intro cartoon (59 cut lines),
+Cedric's nags in 23 rooms, Crispin's house (76), room 2 (the snake), Graham's fall cry (Amiga
+sample of sound 83). Music ducks under speech; waits follow the clips. SPEECH.DAT 213 lines,
+12.3 MB. Rule from the user: where the CD reworded a line, the text box takes the CD wording
+(`tools/maketext.py`); lines that exist only on the CD are left out.
+**Left**: the other ~100 rooms, the later cartoons (110-112 Pearl/fisherman, the ending), maybe
+more Amiga sampled effects (84 more sounds have one), streaming is not needed (clips are read
+one at a time; the table for ~1300 lines is ~16 KB).
+
+**Token-lean plan for the rest** (do the bulk offline, read only exceptions):
+1. Transcribe all 1684 CD clips once, in the background (~1 h CPU, faster-whisper `small.en`),
+   into `port/work/speech/clips.json` (already holds the rooms done so far; `roomclips.py`
+   reads and extends it). Set the venv up again if the scratchpad was cleared:
+   `python3 -m venv V; V/bin/pip install faster-whisper` (its PyAV needs the float input the
+   tools already use).
+2. One batch matcher over all rooms (extend `roomclips.py`: loop over every CD room script,
+   also find literal strings printed in each Amiga script, as for the nags and room 2's
+   tambourine line), writing **files, not terminal output**: `work/speech/lines.tsv` (module,
+   index, clip, score), `work/speech/review.txt` (only scores < 0.9: Amiga text, transcript,
+   proposed CD wording), and a list of print sites that are not PrintDC/proc0_28 (those need a
+   new hook; cartoons 110-112 and the ending are likely such).
+3. Have `makespeech.py` and `maketext.py` read those files instead of hand-edited Python
+   tables, so adding 1000 lines is not 1000 lines of edits in the conversation.
+4. Review `review.txt` in chunks of ~50 lines (proofread the CD wording; decide CD-only lines).
+5. Test only new mechanisms headless (a new print procedure, a new cartoon timing); plain room
+   lines use the proven path, so the user's play-testing covers them. Grep logs for counts, do
+   not dump them; screenshots only when the question is visual.
+6. Rebuild SPEECH.DAT in large batches and tell the user to restart Hatari afterwards (a running
+   game reads the new file through its old table: wrong clips).
+7. Commit after each batch (the docs say what each batch covers).
+
+**Process lessons (so they are not paid for twice)**:
+- Headless logs: `--run-vbls` cuts off the last ~1000 VBLs of buffered output (WORKFLOW.md);
+  the "ym: music" debug line interleaves with KTRACE lines (strip it before parsing).
+- Whisper alone is not a proof of a cut's ends: check word times against the loudness, and keep
+  a cut's edges in the gap between words (loud CD music under the voices fools silence tests).
+- SCI details that cost time: controller `$50` is reverb (not passed to drivers); a channel
+  must start `c0 pp, b0 07 vv, 0a pp`; the byte form of `ldi` is signed (`ldi 255` = -1); Prog's
+  DoAudio leaves acc untouched (always `ldi 0` before calling it from a patch).
+- Before claiming a room has nothing more, grep the text resources for the user's words (Crispin's
+  house was missed because the door was assumed to lead nowhere).
 
 ## Speech from the CD release (feasibility, 2026-11-17)
 - CD data: `AUDIO001.MAP` (10-byte entries: u16 num, u32 vol<<28|offset, u32 size; vol 2 = `AUDIO001.002`),
